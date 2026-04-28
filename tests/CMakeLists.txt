@@ -18,6 +18,7 @@ FetchContent_MakeAvailable(Catch2)
 
 add_executable(obz_tests
     ../libs/blocking_queue/tests/blocking_queue_tests.cpp
+    ../libs/bounded_blocking_queue/tests/bounded_blocking_queue_tests.cpp
 )
 
 # ------------------------------------------------------------------------------
@@ -27,6 +28,7 @@ add_executable(obz_tests
 target_link_libraries(obz_tests
     PRIVATE
         obz::blocking_queue
+        obz::bounded_blocking_queue
         Catch2::Catch2WithMain
 )
 
