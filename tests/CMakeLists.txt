@@ -1,39 +1,38 @@
 # ------------------------------------------------------------------------------
-# CMake - Generated files (root-level)
+# Test dependencies
 # ------------------------------------------------------------------------------
 
-CMakeCache.txt
-CMakeFiles/
-CMakeScripts/
-cmake_install.cmake
-install_manifest.txt
-CTestTestfile.cmake
-compile_commands.json
-Makefile
-Testing/
+include(FetchContent)
+
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.7.1
+)
+
+FetchContent_MakeAvailable(Catch2)
 
 # ------------------------------------------------------------------------------
-# CMake - User / IDE-specific
+# Test executable
 # ------------------------------------------------------------------------------
 
-CMakeLists.txt.user
-CMakeUserPresets.json
+add_executable(obz_tests
+    ../libs/blocking_queue/tests/blocking_queue_tests.cpp
+)
 
 # ------------------------------------------------------------------------------
-# CMake - External dependencies (FetchContent / _deps)
+# Link test dependencies
 # ------------------------------------------------------------------------------
 
-_deps/
+target_link_libraries(obz_tests
+    PRIVATE
+        obz::blocking_queue
+        Catch2::Catch2WithMain
+)
 
 # ------------------------------------------------------------------------------
-# Build directories (out-of-source builds)
+# CTest integration
 # ------------------------------------------------------------------------------
 
-build/
-cmake-build-*/
-
-# ------------------------------------------------------------------------------
-# macOS
-# ------------------------------------------------------------------------------
-
-.DS_Store
+include(Catch)
+catch_discover_tests(obz_tests)

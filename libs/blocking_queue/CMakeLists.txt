@@ -1,39 +1,29 @@
 # ------------------------------------------------------------------------------
-# CMake - Generated files (root-level)
+# Library target
 # ------------------------------------------------------------------------------
 
-CMakeCache.txt
-CMakeFiles/
-CMakeScripts/
-cmake_install.cmake
-install_manifest.txt
-CTestTestfile.cmake
-compile_commands.json
-Makefile
-Testing/
+add_library(obz_blocking_queue INTERFACE)
 
 # ------------------------------------------------------------------------------
-# CMake - User / IDE-specific
+# Public alias
 # ------------------------------------------------------------------------------
 
-CMakeLists.txt.user
-CMakeUserPresets.json
+add_library(obz::blocking_queue ALIAS obz_blocking_queue)
 
 # ------------------------------------------------------------------------------
-# CMake - External dependencies (FetchContent / _deps)
+# Include directories
 # ------------------------------------------------------------------------------
 
-_deps/
+target_include_directories(obz_blocking_queue
+    INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 # ------------------------------------------------------------------------------
-# Build directories (out-of-source builds)
+# Compile features
 # ------------------------------------------------------------------------------
 
-build/
-cmake-build-*/
-
-# ------------------------------------------------------------------------------
-# macOS
-# ------------------------------------------------------------------------------
-
-.DS_Store
+target_compile_features(obz_blocking_queue
+    INTERFACE
+        cxx_std_20
+)

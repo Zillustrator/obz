@@ -1,39 +1,29 @@
-# ------------------------------------------------------------------------------
-# CMake - Generated files (root-level)
-# ------------------------------------------------------------------------------
-
-CMakeCache.txt
-CMakeFiles/
-CMakeScripts/
-cmake_install.cmake
-install_manifest.txt
-CTestTestfile.cmake
-compile_commands.json
-Makefile
-Testing/
+cmake_minimum_required(VERSION 3.21)
 
 # ------------------------------------------------------------------------------
-# CMake - User / IDE-specific
+# Project
 # ------------------------------------------------------------------------------
 
-CMakeLists.txt.user
-CMakeUserPresets.json
+project(obz VERSION 0.1.0 LANGUAGES CXX)
 
 # ------------------------------------------------------------------------------
-# CMake - External dependencies (FetchContent / _deps)
+# Options
 # ------------------------------------------------------------------------------
 
-_deps/
+option(OBZ_BUILD_TESTS "Build obz tests" ON)
+option(OBZ_BUILD_EXAMPLES "Build obz examples" ON)
 
 # ------------------------------------------------------------------------------
-# Build directories (out-of-source builds)
+# Libraries
 # ------------------------------------------------------------------------------
 
-build/
-cmake-build-*/
+add_subdirectory(libs/blocking_queue)
 
 # ------------------------------------------------------------------------------
-# macOS
+# Tests
 # ------------------------------------------------------------------------------
 
-.DS_Store
+if (OBZ_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
