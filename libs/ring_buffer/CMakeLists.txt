@@ -1,31 +1,29 @@
-cmake_minimum_required(VERSION 3.21)
-
 # ------------------------------------------------------------------------------
-# Project
+# Library target
 # ------------------------------------------------------------------------------
 
-project(obz VERSION 0.1.0 LANGUAGES CXX)
+add_library(obz_ring_buffer INTERFACE)
 
 # ------------------------------------------------------------------------------
-# Options
+# Public alias
 # ------------------------------------------------------------------------------
 
-option(OBZ_BUILD_TESTS "Build obz tests" ON)
-option(OBZ_BUILD_EXAMPLES "Build obz examples" ON)
+add_library(obz::ring_buffer ALIAS obz_ring_buffer)
 
 # ------------------------------------------------------------------------------
-# Libraries
+# Include directories
 # ------------------------------------------------------------------------------
 
-add_subdirectory(libs/blocking_queue)
-add_subdirectory(libs/bounded_blocking_queue)
-add_subdirectory(libs/ring_buffer)
+target_include_directories(obz_ring_buffer
+    INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 # ------------------------------------------------------------------------------
-# Tests
+# Compile features
 # ------------------------------------------------------------------------------
 
-if (OBZ_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
+target_compile_features(obz_ring_buffer
+    INTERFACE
+        cxx_std_20
+)
