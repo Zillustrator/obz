@@ -21,6 +21,7 @@ add_executable(obz_tests
     ../libs/bounded_blocking_queue/tests/bounded_blocking_queue_tests.cpp
     ../libs/ring_buffer/tests/ring_buffer_tests.cpp
     ../libs/spsc_ring_queue/tests/spsc_ring_queue_tests.cpp
+    ../libs/mpsc_ring_queue/tests/mpsc_ring_queue_tests.cpp
 )
 
 # ------------------------------------------------------------------------------
@@ -33,6 +34,7 @@ target_link_libraries(obz_tests
         obz::bounded_blocking_queue
         obz::ring_buffer
         obz::spsc_ring_queue
+        obz::mpsc_ring_queue
         Catch2::Catch2WithMain
 )
 
