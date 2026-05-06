@@ -41,14 +41,14 @@ if (queue.try_pop(value)) {
 
 ```cpp
 #include <obz/spsc_ring_queue.hpp>
-#include <thread>
 #include <atomic>
 #include <iostream>
+#include <thread>
 
 int main() {
     obz::spsc_ring_queue<int, 1024> queue;
 
-    std::atomic<bool> done = false;
+    std::atomic<bool> done{false};
 
     std::thread producer([&] {
         for (int i = 0; i < 10; ++i) {
@@ -130,6 +130,22 @@ std::size_t size() const;
 constexpr std::size_t capacity() const;
 ```
 
+`empty()`, `full()`, and `size()` are snapshots. They are useful for diagnostics and simple polling loops, but another thread may push or pop immediately after the call returns.
+
+---
+
+### clear
+
+```cpp
+void clear();
+```
+
+Destroys all currently published elements.
+
+`clear()` requires external synchronization. It is not safe to call while the producer or consumer thread is active.
+
+The destructor calls `clear()` and assumes the producer and consumer have stopped using the queue.
+
 ---
 
 ## Behaviour Summary
@@ -145,6 +161,7 @@ constexpr std::size_t capacity() const;
 
 - Exactly **one producer thread** may call `try_push`  
 - Exactly **one consumer thread** may call `try_pop`  
+- `clear` and destruction require external synchronization  
 - Multiple producers or consumers result in undefined behaviour  
 
 The queue is implemented using:
@@ -203,6 +220,10 @@ write_index == read_index
 
 - No locks or condition variables are used  
 
+The producer publishes constructed objects by storing `write_index` with release ordering. The consumer observes that publication by loading `write_index` with acquire ordering before reading the object.
+
+The consumer releases slots back to the producer by storing `read_index` with release ordering. The producer observes that release by loading `read_index` with acquire ordering before reusing storage.
+
 ---
 
 ## Performance Characteristics
@@ -246,7 +267,6 @@ Do not use when:
 
 Potential extensions:
 
-- multi-producer or multi-consumer variants  
 - wait/notify integration  
 - batch push/pop operations  
 

@@ -125,6 +125,55 @@ TEST_CASE("spsc_ring_queue clear removes all values") {
 
     int value = 0;
     REQUIRE_FALSE(queue.try_pop(value));
+
+    REQUIRE(queue.try_push(3));
+    REQUIRE(queue.try_pop(value));
+    REQUIRE(value == 3);
+    REQUIRE(queue.empty());
+}
+
+TEST_CASE("spsc_ring_queue destroys remaining values on destruction") {
+    struct tracked {
+        explicit tracked(int value, int& destroyed_count)
+            : value(value),
+              destroyed_count(&destroyed_count) {}
+
+        tracked(const tracked&) = delete;
+        tracked& operator=(const tracked&) = delete;
+
+        tracked(tracked&& other) noexcept
+            : value(other.value),
+              destroyed_count(other.destroyed_count) {
+            other.destroyed_count = nullptr;
+        }
+
+        tracked& operator=(tracked&& other) noexcept {
+            value = other.value;
+            destroyed_count = other.destroyed_count;
+            other.destroyed_count = nullptr;
+            return *this;
+        }
+
+        ~tracked() {
+            if (destroyed_count != nullptr) {
+                ++(*destroyed_count);
+            }
+        }
+
+        int value;
+        int* destroyed_count;
+    };
+
+    int destroyed_count = 0;
+
+    {
+        obz::spsc_ring_queue<tracked, 3> queue;
+
+        REQUIRE(queue.try_emplace(1, destroyed_count));
+        REQUIRE(queue.try_emplace(2, destroyed_count));
+    }
+
+    REQUIRE(destroyed_count == 2);
 }
 
 TEST_CASE("spsc_ring_queue transfers values between one producer and one consumer") {
