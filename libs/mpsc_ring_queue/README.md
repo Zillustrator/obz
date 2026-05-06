@@ -199,6 +199,27 @@ The queue is implemented using:
 
 ---
 
+## Synchronization Model
+
+The queue uses two related synchronization layers:
+
+1. `write_index_` assigns unique logical positions to producers.
+2. Each cell's `sequence` value describes whether that physical slot is free, published, or waiting for reuse.
+
+`write_index_` is the contention point between producers. Producers use `compare_exchange_weak` to claim exactly one logical write position. Winning that CAS gives a producer ownership of one slot, but it does not publish the object to the consumer.
+
+`read_index_` is not a contention point because there is exactly one consumer. It is the consumer's FIFO cursor: the consumer only attempts to pop the cell at `read_index_ % Capacity`.
+
+The per-cell `sequence` value is the state gate between producers and the consumer:
+
+- Producers use it to decide whether a physical slot is free for a specific write position.
+- The consumer uses it to decide whether the next FIFO slot has actually been published.
+- Producers use it again after wrap-around to avoid reusing storage before the consumer has destroyed the previous object.
+
+This separation is the key difference from `spsc_ring_queue`. In SPSC, producer and consumer cursors are enough. In MPSC, producers also need a per-slot publication state because a producer can claim a write position and then be delayed before constructing the object.
+
+---
+
 ## Design Notes
 
 `mpsc_ring_queue<T, Capacity>` is a compile-time-capacity queue:
@@ -248,6 +269,14 @@ cell.sequence = N + Capacity
 ```
 
 This per-cell sequence number is what prevents producers from overwriting unread data and prevents the consumer from reading unconstructed storage.
+
+The sequence value has a simple lifecycle for logical position `N`:
+
+| Sequence value | Meaning |
+|----------------|---------|
+| `N` | The cell is free for the producer that wants to write position `N`. |
+| `N + 1` | The producer has constructed the object and published it to the consumer. |
+| `N + Capacity` | The consumer has destroyed the object and released the cell for the next wrap-around. |
 
 ---
 
@@ -310,6 +339,8 @@ cell.sequence.store(read + Capacity, std::memory_order_release);
 Producers load the sequence with acquire before reusing a cell. This ensures a producer does not construct a new object in the same storage before the previous destruction is visible.
 
 The `write_index_` CAS uses relaxed ordering because it only assigns a unique position to one producer. It does not publish object contents. Object publication is handled by the cell sequence release store.
+
+`read_index_` also uses relaxed stores in `try_pop` because it is written only by the single consumer. Slot reuse visibility is not carried by `read_index_`; it is carried by the release store to the cell's `sequence` value after destruction.
 
 ---
 
