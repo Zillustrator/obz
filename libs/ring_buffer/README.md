@@ -128,7 +128,7 @@ Removes all elements from the buffer.
 
 ---
 
-### state inspection
+### State Inspection
 
 ```cpp
 bool empty() const;
@@ -150,6 +150,14 @@ std::size_t capacity() const;
 ---
 
 ## Design Notes
+
+- `ring_buffer<T>` is a runtime-capacity container. The capacity is selected when the buffer is constructed:
+
+```cpp
+obz::ring_buffer<int> buffer(1024);
+```
+
+- This makes it suitable as a general-purpose circular buffer when the size may come from configuration or runtime workload decisions.
 
 - Internally uses a circular buffer with:
   - `head` index (read position)  

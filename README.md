@@ -44,6 +44,11 @@ Each library lives under `libs/<library_name>` and is documented in its own `REA
 
 The root README intentionally avoids duplicating per-library APIs and examples. This keeps the repository overview stable as new libraries are added.
 
+Capacity is expressed according to the library's purpose:
+
+- General-purpose containers such as `ring_buffer<T>` use runtime capacity selected at construction.
+- Lock-free ring queues such as `spsc_ring_queue<T, Capacity>` and `mpsc_ring_queue<T, Capacity>` use compile-time capacity so storage is embedded directly in the queue object.
+
 Typical library layout:
 
 ```text
@@ -78,7 +83,7 @@ cmake --build build
 
 ## Build Options
 
-### Build with tests (default)
+### Build With Tests (Default)
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -88,7 +93,7 @@ ctest --test-dir build --output-on-failure
 
 ---
 
-### Build without tests
+### Build Without Tests
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DOBZ_BUILD_TESTS=OFF
@@ -97,7 +102,7 @@ cmake --build build
 
 ---
 
-### Build without examples
+### Build Without Examples
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DOBZ_BUILD_EXAMPLES=OFF
@@ -106,7 +111,7 @@ cmake --build build
 
 ---
 
-### Build without tests or examples
+### Build Without Tests Or Examples
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \

@@ -201,6 +201,14 @@ The queue is implemented using:
 
 ## Design Notes
 
+`mpsc_ring_queue<T, Capacity>` is a compile-time-capacity queue:
+
+```cpp
+obz::mpsc_ring_queue<int, 1024> queue;
+```
+
+The capacity is part of the type so storage can be embedded directly in the queue object with no allocation.
+
 Internally, the queue is a circular buffer of `Capacity` cells. Each cell contains raw storage for `T` and a sequence number.
 
 At initialization:

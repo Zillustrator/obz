@@ -156,7 +156,7 @@ Marks the queue as closed:
 
 ---
 
-### state inspection
+### State Inspection
 
 ```cpp
 bool empty() const;

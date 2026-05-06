@@ -121,7 +121,7 @@ Returns:
 
 ---
 
-### state inspection
+### State Inspection
 
 ```cpp
 bool empty() const;
@@ -178,6 +178,14 @@ This is particularly important in low-latency and high-throughput systems.
 ---
 
 ## Design Notes
+
+- `spsc_ring_queue<T, Capacity>` is a compile-time-capacity queue:
+
+```cpp
+obz::spsc_ring_queue<int, 1024> queue;
+```
+
+- The capacity is part of the type so storage can be embedded directly in the queue object with no allocation.
 
 - Internally uses a circular buffer of size `Capacity`  
 - Read and write indices grow monotonically and wrap via modulo indexing  
