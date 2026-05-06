@@ -4,7 +4,9 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -54,7 +56,7 @@ TEST_CASE("bounded_blocking_queue push blocks while queue is full") {
 
     queue.push(1);
 
-    std::atomic<bool> push_completed = false;
+    std::atomic<bool> push_completed{false};
 
     std::thread producer([&] {
         queue.push(2);
@@ -80,7 +82,7 @@ TEST_CASE("bounded_blocking_queue push blocks while queue is full") {
 TEST_CASE("bounded_blocking_queue wait_and_pop blocks while queue is empty") {
     obz::bounded_blocking_queue<int> queue(1);
 
-    std::atomic<bool> pop_completed = false;
+    std::atomic<bool> pop_completed{false};
     int result = 0;
 
     std::thread consumer([&] {
@@ -103,7 +105,7 @@ TEST_CASE("bounded_blocking_queue wait_and_pop blocks while queue is empty") {
 TEST_CASE("bounded_blocking_queue close wakes waiting consumer") {
     obz::bounded_blocking_queue<int> queue(1);
 
-    std::atomic<bool> consumer_finished = false;
+    std::atomic<bool> consumer_finished{false};
     bool pop_result = true;
 
     std::thread consumer([&] {
@@ -129,8 +131,8 @@ TEST_CASE("bounded_blocking_queue close wakes waiting producer") {
 
     queue.push(1);
 
-    std::atomic<bool> producer_finished = false;
-    std::atomic<bool> producer_threw = false;
+    std::atomic<bool> producer_finished{false};
+    std::atomic<bool> producer_threw{false};
 
     std::thread producer([&] {
         try {
@@ -186,4 +188,85 @@ TEST_CASE("bounded_blocking_queue allows remaining values to be popped after clo
     REQUIRE(value == 2);
 
     REQUIRE_FALSE(queue.wait_and_pop(value));
+    REQUIRE_FALSE(queue.try_pop(value));
+}
+
+TEST_CASE("bounded_blocking_queue closed reports shutdown state") {
+    obz::bounded_blocking_queue<int> queue(2);
+
+    REQUIRE_FALSE(queue.closed());
+
+    queue.close();
+
+    REQUIRE(queue.closed());
+
+    queue.close();
+
+    REQUIRE(queue.closed());
+}
+
+TEST_CASE("bounded_blocking_queue transfers values from multiple producers to multiple consumers") {
+    constexpr int producer_count = 4;
+    constexpr int consumer_count = 3;
+    constexpr int values_per_producer = 10000;
+    constexpr int total_count = producer_count * values_per_producer;
+
+    obz::bounded_blocking_queue<int> queue(128);
+
+    std::vector<int> received;
+    received.reserve(total_count);
+
+    std::mutex received_mutex;
+
+    std::vector<std::thread> consumers;
+    consumers.reserve(consumer_count);
+
+    for (int consumer = 0; consumer < consumer_count; ++consumer) {
+        consumers.emplace_back([&] {
+            int value = 0;
+
+            while (queue.wait_and_pop(value)) {
+                std::lock_guard lock(received_mutex);
+                received.push_back(value);
+            }
+        });
+    }
+
+    std::vector<std::thread> producers;
+    producers.reserve(producer_count);
+
+    for (int producer = 0; producer < producer_count; ++producer) {
+        producers.emplace_back([&, producer] {
+            const int base = producer * values_per_producer;
+
+            for (int offset = 0; offset < values_per_producer; ++offset) {
+                queue.push(base + offset);
+            }
+        });
+    }
+
+    for (auto& producer : producers) {
+        producer.join();
+    }
+
+    queue.close();
+
+    for (auto& consumer : consumers) {
+        consumer.join();
+    }
+
+    REQUIRE(received.size() == total_count);
+
+    std::vector<bool> seen(total_count, false);
+
+    for (const int value : received) {
+        REQUIRE(value >= 0);
+        REQUIRE(value < total_count);
+        REQUIRE_FALSE(seen[value]);
+        seen[value] = true;
+    }
+
+    for (const bool was_seen : seen) {
+        REQUIRE(was_seen);
+    }
 }

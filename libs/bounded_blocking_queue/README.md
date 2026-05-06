@@ -94,6 +94,7 @@ void emplace(Args&&... args);
 Constructs an element in-place at the back of the queue.
 
 - Blocks if the queue is full  
+- Throws `std::runtime_error` if the queue is closed  
 
 ---
 
@@ -166,6 +167,8 @@ std::size_t capacity() const;
 bool closed() const;
 ```
 
+`empty()`, `full()`, and `size()` are synchronized snapshots. They are exact when observed, but another thread may push, pop, or close the queue immediately after the call returns.
+
 ---
 
 ## Threading Model
@@ -184,9 +187,13 @@ bool closed() const;
 | Operation        | When Queue is Empty | When Queue is Full | When Closed |
 |-----------------|--------------------|--------------------|-------------|
 | `push`          | succeeds           | blocks             | throws      |
+| `emplace`       | succeeds           | blocks             | throws      |
 | `try_push`      | succeeds           | returns false      | returns false |
 | `wait_and_pop`  | blocks             | succeeds           | returns false if empty |
 | `try_pop`       | returns false      | succeeds           | succeeds if not empty |
+| `close`         | wakes consumers    | wakes producers    | idempotent |
+
+Closing the queue prevents future pushes, but it does not discard already queued values. Consumers can continue popping remaining values until the queue is both closed and empty.
 
 ---
 
@@ -198,7 +205,7 @@ bool closed() const;
   - `not_empty`
   - `not_full`  
 - `close()` ensures clean shutdown of blocked threads  
-- Destructor calls `close()` to avoid deadlocks  
+- Destructor calls `close()`, but callers must still ensure no other threads are using or waiting on the queue during destruction. `close()` is a shutdown signal, not thread lifetime management.  
 
 ---
 
