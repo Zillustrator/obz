@@ -17,6 +17,12 @@ public:
 
     spsc_ring_queue() = default;
 
+    spsc_ring_queue(const spsc_ring_queue&) = delete;
+    spsc_ring_queue& operator=(const spsc_ring_queue&) = delete;
+
+    spsc_ring_queue(spsc_ring_queue&&) = delete;
+    spsc_ring_queue& operator=(spsc_ring_queue&&) = delete;
+
     ~spsc_ring_queue() {
         clear();
     }
