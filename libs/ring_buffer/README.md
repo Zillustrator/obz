@@ -1,18 +1,20 @@
 # obz::ring_buffer
 
-A fixed-capacity circular buffer providing fast FIFO storage with no dynamic allocation after construction.
+A runtime-capacity circular buffer providing fast FIFO storage with no dynamic allocation after construction.
 
-The `ring_buffer` is a lightweight container designed for predictable performance and constant memory usage.
+The `ring_buffer` is a lightweight single-threaded container designed for predictable performance and constant memory usage after its initial allocation.
 
 ---
 
 ## Features
 
+- Runtime capacity selected at construction  
 - Fixed capacity (no resizing)  
 - Constant-time push and pop operations  
 - FIFO ordering  
 - Wraparound (circular) storage  
-- No dynamic allocation after construction  
+- One allocation at construction and no dynamic allocation after construction  
+- Supports non-default-constructible types  
 - Header-only implementation  
 
 ---
@@ -126,6 +128,8 @@ void clear();
 
 Removes all elements from the buffer.
 
+After `clear()`, the buffer can be reused with the same capacity.
+
 ---
 
 ### State Inspection
@@ -149,6 +153,14 @@ std::size_t capacity() const;
 
 ---
 
+## Threading Model
+
+`ring_buffer` is not internally synchronized.
+
+Use external synchronization if multiple threads need to access the same buffer, or use a queue type such as `blocking_queue` or `bounded_blocking_queue` when thread-safe producer-consumer behaviour is required.
+
+---
+
 ## Design Notes
 
 - `ring_buffer<T>` is a runtime-capacity container. The capacity is selected when the buffer is constructed:
@@ -169,6 +181,32 @@ obz::ring_buffer<int> buffer(1024);
 - No resizing — capacity is fixed at construction  
 
 - This implementation uses raw allocated storage, so elements are constructed only when inserted and destroyed when removed.
+
+---
+
+## Misuse Resistance
+
+- Construction with zero capacity throws `std::invalid_argument`.
+- Pushing to a full buffer returns `false` instead of overwriting existing values.
+- Popping from an empty buffer returns `false`.
+- Accessing `front()` on an empty buffer throws `std::runtime_error`.
+- Copy and move operations are disabled so ownership of the raw storage remains simple and explicit.
+
+---
+
+## Implementation Notes
+
+The buffer allocates raw storage for `capacity` elements during construction.
+
+Elements are not default-constructed. `emplace_back` constructs an element into the current tail slot with `std::construct_at`, and `pop_front` destroys the current head slot with `std::destroy_at`.
+
+The `head`, `tail`, and `size` members define the invariant:
+
+- `head` points at the next element to read
+- `tail` points at the next slot to write
+- `size` tracks how many constructed elements are currently stored
+
+Modulo arithmetic wraps `head` and `tail` back to the start of the allocation.
 
 ---
 
@@ -198,11 +236,8 @@ Consider alternatives when:
 
 Potential extensions:
 
-- overwrite-on-full mode  
-- iterator support  
-- support for non-default-constructible types  
-- lock-free SPSC ring queue built on top of this  
-- custom allocator support  
+- iterator support
+- allocator-aware storage
 
 ---
 

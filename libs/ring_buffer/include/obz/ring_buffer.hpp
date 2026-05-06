@@ -11,12 +11,8 @@ template <typename T>
 class ring_buffer {
 public:
     explicit ring_buffer(std::size_t capacity)
-        : capacity_(capacity),
-          buffer_(std::allocator<T>{}.allocate(capacity)) {
-        if (capacity_ == 0) {
-            throw std::invalid_argument("ring_buffer capacity must be greater than zero");
-        }
-    }
+        : capacity_(validate_capacity(capacity)),
+          buffer_(std::allocator<T>{}.allocate(capacity_)) {}
 
     ring_buffer(const ring_buffer&) = delete;
     ring_buffer& operator=(const ring_buffer&) = delete;
@@ -111,6 +107,14 @@ public:
     }
 
 private:
+    static std::size_t validate_capacity(std::size_t capacity) {
+        if (capacity == 0) {
+            throw std::invalid_argument("ring_buffer capacity must be greater than zero");
+        }
+
+        return capacity;
+    }
+
     T* slot(std::size_t index) {
         return buffer_ + index;
     }
