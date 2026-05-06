@@ -145,6 +145,8 @@ std::size_t size() const;
 bool closed() const;
 ```
 
+`empty()` and `size()` are synchronized snapshots. They are exact when observed, but another thread may push, pop, or close the queue immediately after the call returns.
+
 ---
 
 ## Threading Model
@@ -158,12 +160,26 @@ bool closed() const;
 
 ---
 
+## Behaviour Summary
+
+| Operation        | When Queue is Empty | When Queue Has Values | When Closed |
+|-----------------|---------------------|-----------------------|-------------|
+| `push`          | succeeds            | succeeds              | throws      |
+| `emplace`       | succeeds            | succeeds              | throws      |
+| `wait_and_pop`  | blocks              | returns next value    | returns false if empty |
+| `try_pop`       | returns false       | returns next value    | returns false if empty |
+| `close`         | wakes waiters       | keeps queued values available | idempotent |
+
+Closing the queue prevents future pushes, but it does not discard already queued values. Consumers can continue popping remaining values until the queue is both closed and empty.
+
+---
+
 ## Design Notes
 
 - FIFO ordering is preserved  
 - `wait_and_pop` uses a predicate to handle spurious wakeups  
 - `close()` enables clean shutdown of worker threads  
-- Destructor calls `close()` to avoid deadlocks during teardown  
+- Destructor calls `close()`, but callers must still ensure no other threads are using or waiting on the queue during destruction. `close()` is a shutdown signal, not thread lifetime management.  
 
 ---
 
