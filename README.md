@@ -22,15 +22,15 @@ The goal of this project is to provide small, focused, and independent C++20 lib
 ```
 obz/
 ├── CMakeLists.txt
-├── cmake/
 ├── libs/
-│   └── blocking_queue/
+│   └── <library_name>/
 │       ├── CMakeLists.txt
+│       ├── README.md
 │       ├── include/
 │       │   └── obz/
-│       │       └── blocking_queue.hpp
+│       │       └── <library_name>.hpp
 │       └── tests/
-│           └── blocking_queue_tests.cpp
+│           └── <library_name>_tests.cpp
 ├── tests/
 │   └── CMakeLists.txt
 └── README.md
@@ -40,21 +40,18 @@ obz/
 
 ## Libraries
 
-### blocking_queue
+Each library lives under `libs/<library_name>` and is documented in its own `README.md`.
 
-A thread-safe blocking queue for producer-consumer scenarios.
+The root README intentionally avoids duplicating per-library APIs and examples. This keeps the repository overview stable as new libraries are added.
 
-```cpp
-#include <obz/blocking_queue.hpp>
+Typical library layout:
 
-obz::blocking_queue<int> queue;
-
-queue.push(42);
-
-int value = 0;
-if (queue.wait_and_pop(value)) {
-    // use value
-}
+```text
+libs/<library_name>/
+├── CMakeLists.txt
+├── README.md
+├── include/obz/<library_name>.hpp
+└── tests/<library_name>_tests.cpp
 ```
 
 ---
@@ -133,7 +130,7 @@ ctest --test-dir build --output-on-failure
 All public APIs are exposed under the `obz` namespace:
 
 ```cpp
-obz::blocking_queue<int> queue;
+obz::<library_name> object;
 ```
 
 ---
@@ -145,7 +142,7 @@ Libraries are exposed as namespaced CMake targets:
 ```cmake
 target_link_libraries(my_app
     PRIVATE
-        obz::blocking_queue
+        obz::<library_name>
 )
 ```
 
