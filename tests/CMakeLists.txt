@@ -22,6 +22,7 @@ add_executable(obz_tests
     ../libs/ring_buffer/tests/ring_buffer_tests.cpp
     ../libs/spsc_ring_queue/tests/spsc_ring_queue_tests.cpp
     ../libs/mpsc_ring_queue/tests/mpsc_ring_queue_tests.cpp
+    ../libs/weighted_set/tests/weighted_set_tests.cpp
 )
 
 # ------------------------------------------------------------------------------
@@ -35,6 +36,7 @@ target_link_libraries(obz_tests
         obz::ring_buffer
         obz::spsc_ring_queue
         obz::mpsc_ring_queue
+        obz::weighted_set
         Catch2::Catch2WithMain
 )
 
