@@ -25,6 +25,7 @@ add_executable(obz_tests
     ../libs/weighted_set/tests/weighted_set_tests.cpp
     ../libs/endian/tests/endian_tests.cpp
     ../libs/transport/tests/transport_tests.cpp
+    ../libs/http/tests/http_tests.cpp
 )
 
 # ------------------------------------------------------------------------------
@@ -41,6 +42,7 @@ target_link_libraries(obz_tests
         obz::weighted_set
         obz::endian
         obz::transport
+        obz::http
         Catch2::Catch2WithMain
 )
 
