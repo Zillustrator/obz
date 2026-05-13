@@ -224,6 +224,10 @@ The producer publishes constructed objects by storing `write_index` with release
 
 The consumer releases slots back to the producer by storing `read_index` with release ordering. The producer observes that release by loading `read_index` with acquire ordering before reusing storage.
 
+The read and write indices are monotonically increasing `std::size_t` counters. Physical storage is selected with `index % Capacity`, while queue state is computed from unsigned counter differences. This design assumes the counters will not wrap so far that an active producer/consumer pair loses the ability to distinguish full and empty states. In normal long-running applications this would require an extremely large number of operations, but it is still part of the queue's correctness contract.
+
+`empty()`, `full()`, and `size()` report snapshots of concurrently changing state. They are suitable for polling loops and diagnostics, not for making exclusive ownership decisions without the corresponding `try_push` or `try_pop` call.
+
 ---
 
 ## Performance Characteristics
