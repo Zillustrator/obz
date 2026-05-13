@@ -98,7 +98,8 @@ TEST_CASE("transport tcp_listener accepts a tcp_socket connection on localhost")
             auto socket = listener.accept();
 
             server_received = socket.receive(1024);
-            server_bytes_sent = socket.send(response);
+            socket.send_all(response);
+            server_bytes_sent = response.size();
         } catch (...) {
             server_error = std::current_exception();
         }
@@ -107,7 +108,7 @@ TEST_CASE("transport tcp_listener accepts a tcp_socket connection on localhost")
     obz::transport::tcp_socket client;
     client.connect(listener_endpoint);
 
-    REQUIRE(client.send(request) == request.size());
+    client.send_all(request);
 
     const auto client_received = client.receive(1024);
 
@@ -142,4 +143,11 @@ TEST_CASE("transport sockets report open state and close idempotently") {
     socket.close();
 
     REQUIRE_FALSE(socket.is_open());
+}
+
+TEST_CASE("transport tcp_socket send_all rejects unopened sockets") {
+    obz::transport::tcp_socket socket;
+    const auto payload = bytes({1, 2, 3});
+
+    REQUIRE_THROWS_AS(socket.send_all(payload), std::runtime_error);
 }

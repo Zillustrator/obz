@@ -25,6 +25,7 @@ public:
     void connect(const endpoint& remote_endpoint);
 
     std::size_t send(std::span<const std::byte> data);
+    void send_all(std::span<const std::byte> data);
     std::vector<std::byte> receive(std::size_t max_bytes = 4096);
 
     void close();

@@ -12,6 +12,7 @@ This library solves one narrow problem: moving bytes between IPv4 endpoints whil
 - Move-only TCP socket wrapper
 - TCP listener with `accept`
 - UDP socket with `send_to` and `receive_from`
+- TCP `send_all` helper for complete buffer writes
 - RAII close in destructors
 - `std::system_error` for operating-system socket failures
 - Byte-oriented APIs using `std::byte` and `std::span`
@@ -104,6 +105,7 @@ public:
     void connect(const endpoint& remote_endpoint);
 
     std::size_t send(std::span<const std::byte> data);
+    void send_all(std::span<const std::byte> data);
     std::vector<std::byte> receive(std::size_t max_bytes = 4096);
 
     void close();
@@ -115,6 +117,8 @@ public:
 ```
 
 `send` and `receive` are byte-oriented wrappers over native socket operations. A single `send` may write fewer bytes than requested.
+
+`send_all` repeatedly calls `send` until the full span has been written, or throws if the socket reports failure.
 
 ---
 
@@ -181,6 +185,13 @@ This keeps the user-facing API stable while letting CMake select the platform ba
 
 The POSIX backend is covered by the current local build. The Windows backend follows the same internal boundary and should be validated on Windows before treating it as production-ready.
 
+Before a public production-ready claim, validate this library in CI on:
+
+- macOS or Linux for the POSIX backend
+- Windows for the Winsock backend
+
+The Windows validation should build the library, run the non-network tests, and run the localhost TCP/UDP integration tests in an environment where loopback sockets are permitted.
+
 ---
 
 ## When to Use
@@ -213,7 +224,7 @@ Potential extensions:
 - timeout configuration
 - DNS resolution helpers
 - IPv6 endpoints
-- send-all helper for TCP streams
+- vectored send/receive helpers for TCP streams
 
 ---
 

@@ -2,6 +2,7 @@
 
 #include "socket_platform.hpp"
 
+#include <stdexcept>
 #include <utility>
 
 namespace obz::transport {
@@ -47,6 +48,21 @@ std::size_t tcp_socket::send(std::span<const std::byte> data) {
     }
 
     return detail::send_tcp(socket_handle_, data);
+}
+
+void tcp_socket::send_all(std::span<const std::byte> data) {
+    std::size_t bytes_sent = 0;
+
+    while (bytes_sent < data.size()) {
+        const auto remaining = data.subspan(bytes_sent);
+        const auto sent = send(remaining);
+
+        if (sent == 0) {
+            throw std::runtime_error("TCP socket send wrote zero bytes");
+        }
+
+        bytes_sent += sent;
+    }
 }
 
 std::vector<std::byte> tcp_socket::receive(std::size_t max_bytes) {
