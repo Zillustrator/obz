@@ -180,7 +180,7 @@ weighted_set(weighted_set&&) = default;
 weighted_set& operator=(weighted_set&&) = default;
 ```
 
-`weighted_set` has ordinary value semantics. Copying creates another set with the same values and weights. Moving transfers the stored values, index, and total weight.
+`weighted_set` has ordinary value semantics. Copying creates another set with the same values and weights. Moving transfers the stored values and total weight.
 
 ---
 
@@ -191,13 +191,10 @@ auto begin() const;
 auto end() const;
 ```
 
-Iterates over entries containing:
+Iterates over map entries containing:
 
 ```cpp
-struct entry {
-    T value;
-    weight_type weight;
-};
+std::pair<const T, weight_type>
 ```
 
 Iteration order is not part of the API contract.
@@ -230,7 +227,7 @@ This keeps the rules simple:
 - zero is invalid
 - negative weights are impossible
 - floating-point precision, `NaN`, and infinity are avoided
-- random selection can use an integer distribution over `[1, total_weight()]`
+- random selection can use an integer distribution over `[0, total_weight())`
 
 The caller supplies the random engine:
 
@@ -240,6 +237,26 @@ set.random(generator);
 ```
 
 This avoids hidden random state inside the container and makes tests repeatable.
+
+Weighted selection is modeled as a set of half-open intervals over the range `[0, total_weight())`.
+
+For example, these entries:
+
+| Value | Weight |
+|-------|--------|
+| coin  | 80     |
+| gem   | 15     |
+| relic | 5      |
+
+form intervals like:
+
+| Interval | Value |
+|----------|-------|
+| `[0, 80)` | coin |
+| `[80, 95)` | gem |
+| `[95, 100)` | relic |
+
+`random()` draws one integer from that total range and returns the value whose interval contains it. This keeps the implementation easy to reason about while preserving the expected probabilities.
 
 The mutation API is intentionally explicit:
 
@@ -268,15 +285,17 @@ Duplicate insertion is treated as an expected condition and returns `false`.
 
 ## Implementation Notes
 
-The implementation stores entries in a `std::vector` and keeps an `std::unordered_map` from value to vector index.
+The implementation stores values and weights directly in a `std::unordered_map` and keeps a cached `total_weight_`.
 
 This gives:
 
 - O(1) average `contains`
 - O(1) average `weight_of`
 - O(1) average `set_weight`
-- O(1) average `erase` by swapping with the last entry
+- O(1) average `erase`
 - O(n) `random`, using a cumulative weight scan
+
+The implementation favors a direct representation over a more elaborate indexed structure. For typical small weighted-choice sets, the simpler map-based design is easier to audit and document. If random selection needed to be very fast for large collections, a prefix-sum or alias-table structure would be a different design with different update costs.
 
 The O(n) random scan is deliberate for the first version. It is simple, easy to audit, and suitable for moderate set sizes. If repeated sampling from large mostly-static sets becomes important, an alias-table or cached-prefix variant could be added later as a separate optimization.
 
@@ -288,7 +307,7 @@ The O(n) random scan is deliberate for the first version. It is simple, easy to 
 
 - hashable by `Hash`
 - equality-comparable by `KeyEqual`
-- nothrow move assignable
+- usable as a key in `std::unordered_map`
 
 Custom hashing and equality can be supplied through the template parameters:
 

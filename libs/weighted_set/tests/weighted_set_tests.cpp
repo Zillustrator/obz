@@ -170,8 +170,8 @@ TEST_CASE("weighted_set supports iteration over entries") {
     std::vector<std::string> values;
 
     for (const auto& entry : set) {
-        values.push_back(entry.value);
-        total += entry.weight;
+        values.push_back(entry.first);
+        total += entry.second;
     }
 
     REQUIRE(values.size() == 2);

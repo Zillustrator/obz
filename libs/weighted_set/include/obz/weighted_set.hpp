@@ -6,10 +6,8 @@
 #include <limits>
 #include <random>
 #include <stdexcept>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
-#include <vector>
 
 namespace obz {
 
@@ -19,19 +17,11 @@ template <
     typename KeyEqual = std::equal_to<T>>
 class weighted_set {
 public:
-    static_assert(std::is_nothrow_move_assignable_v<T>,
-                  "weighted_set requires nothrow move assignment");
-
     using value_type = T;
     using weight_type = std::uint64_t;
     using size_type = std::size_t;
-
-    struct entry {
-        T value;
-        weight_type weight;
-    };
-
-    using const_iterator = typename std::vector<entry>::const_iterator;
+    using map_type = std::unordered_map<T, weight_type, Hash, KeyEqual>;
+    using const_iterator = typename map_type::const_iterator;
 
     weighted_set() = default;
 
@@ -44,45 +34,27 @@ public:
     bool insert(T value, weight_type weight) {
         validate_weight(weight);
 
-        if (contains(value)) {
+        if (weights_.contains(value)) {
             return false;
         }
 
         ensure_can_add(weight);
 
-        const auto index = entries_.size();
-        entries_.push_back(entry{std::move(value), weight});
-
-        try {
-            indices_.emplace(entries_.back().value, index);
-        } catch (...) {
-            entries_.pop_back();
-            throw;
-        }
+        weights_.emplace(std::move(value), weight);
 
         total_weight_ += weight;
         return true;
     }
 
     bool erase(const T& value) {
-        const auto found = indices_.find(value);
+        const auto found = weights_.find(value);
 
-        if (found == indices_.end()) {
+        if (found == weights_.end()) {
             return false;
         }
 
-        const auto index = found->second;
-        const auto last_index = entries_.size() - 1;
-
-        total_weight_ -= entries_[index].weight;
-        indices_.erase(found);
-
-        if (index != last_index) {
-            entries_[index] = std::move(entries_[last_index]);
-            indices_[entries_[index].value] = index;
-        }
-
-        entries_.pop_back();
+        total_weight_ -= found->second;
+        weights_.erase(found);
 
         return true;
     }
@@ -90,35 +62,34 @@ public:
     bool set_weight(const T& value, weight_type weight) {
         validate_weight(weight);
 
-        const auto found = indices_.find(value);
+        const auto found = weights_.find(value);
 
-        if (found == indices_.end()) {
+        if (found == weights_.end()) {
             return false;
         }
 
-        entry& current = entries_[found->second];
-        const auto previous_weight = current.weight;
+        const auto previous_weight = found->second;
 
         ensure_can_replace(previous_weight, weight);
 
-        current.weight = weight;
+        found->second = weight;
         total_weight_ = total_weight_ - previous_weight + weight;
 
         return true;
     }
 
     weight_type weight_of(const T& value) const {
-        const auto found = indices_.find(value);
+        const auto found = weights_.find(value);
 
-        if (found == indices_.end()) {
+        if (found == weights_.end()) {
             throw std::out_of_range("weighted_set does not contain value");
         }
 
-        return entries_[found->second].weight;
+        return found->second;
     }
 
     bool contains(const T& value) const {
-        return indices_.contains(value);
+        return weights_.contains(value);
     }
 
     template <typename UniformRandomBitGenerator>
@@ -127,16 +98,16 @@ public:
             throw std::runtime_error("cannot choose random value from empty weighted_set");
         }
 
-        std::uniform_int_distribution<weight_type> distribution(weight_type{1}, total_weight_);
+        std::uniform_int_distribution<weight_type> distribution(weight_type{}, total_weight_ - 1);
         const auto target = distribution(generator);
 
         weight_type cumulative{};
 
-        for (const auto& current : entries_) {
-            cumulative += current.weight;
+        for (const auto& [value, weight] : weights_) {
+            cumulative += weight;
 
-            if (target <= cumulative) {
-                return current.value;
+            if (target < cumulative) {
+                return value;
             }
         }
 
@@ -144,17 +115,16 @@ public:
     }
 
     void clear() {
-        entries_.clear();
-        indices_.clear();
+        weights_.clear();
         total_weight_ = weight_type{};
     }
 
     bool empty() const {
-        return entries_.empty();
+        return weights_.empty();
     }
 
     size_type size() const {
-        return entries_.size();
+        return weights_.size();
     }
 
     weight_type total_weight() const {
@@ -162,11 +132,11 @@ public:
     }
 
     const_iterator begin() const {
-        return entries_.begin();
+        return weights_.begin();
     }
 
     const_iterator end() const {
-        return entries_.end();
+        return weights_.end();
     }
 
 private:
@@ -190,8 +160,7 @@ private:
         }
     }
 
-    std::vector<entry> entries_;
-    std::unordered_map<T, size_type, Hash, KeyEqual> indices_;
+    map_type weights_;
     weight_type total_weight_{};
 };
 
