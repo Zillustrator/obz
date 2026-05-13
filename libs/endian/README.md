@@ -99,6 +99,8 @@ Throws `std::out_of_range` if the value would exceed the buffer bounds.
 
 Only integer types are supported. Passing a non-integral type, or `bool`, fails at compile time.
 
+Signed integer values are encoded through the corresponding unsigned representation. This is intended for two's-complement signed integer representations, which are used by the mainstream platforms this project targets. For protocols that require exact portability across unusual signed integer representations, prefer unsigned integer fields at the binary boundary.
+
 ---
 
 ## Design Notes
@@ -108,6 +110,8 @@ The API takes an explicit `std::span<std::byte>` and offset so callers can use i
 Bounds checks use exceptions rather than `assert`, so invalid ranges are still rejected in release builds.
 
 Signed values are converted through the corresponding unsigned type before shifting and masking. This keeps the byte extraction logic explicit and avoids relying on signed shift behavior.
+
+Reading signed values casts the decoded unsigned representation back to the requested signed type. On mainstream two's-complement platforms this preserves the expected bit pattern. Unsigned integer fields remain the most portable choice for externally specified binary protocols.
 
 `std::byte` is used instead of `char` or `std::uint8_t` to make the API state its intent: the buffer is raw storage, not text and not an integer array.
 
