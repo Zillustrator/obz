@@ -278,6 +278,10 @@ The sequence value has a simple lifecycle for logical position `N`:
 | `N + 1` | The producer has constructed the object and published it to the consumer. |
 | `N + Capacity` | The consumer has destroyed the object and released the cell for the next wrap-around. |
 
+The queue uses monotonically increasing `std::size_t` logical positions and sequence values. Physical storage is selected with modulo indexing, but correctness depends on the logical counters not wrapping so far that old and new sequence states become indistinguishable. In normal long-running applications this would require an extremely large number of operations, but it is still part of the queue's correctness contract.
+
+`empty()`, `full()`, and `size()` are concurrent snapshots. In particular, `size()` includes producer-reserved slots that may not have been published yet. Treat these functions as diagnostics or polling hints; `try_push` and `try_pop` are the operations that establish whether a push or pop actually happened.
+
 ---
 
 ## Producer Coordination
