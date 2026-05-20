@@ -346,8 +346,14 @@ public:
     emotional_state(double pleasantness, double energy)
         : pleasantness_(clamped_coordinate(pleasantness)),
           energy_(clamped_coordinate(energy)),
-          pleasantness_direction_(axis_direction(pleasantness_, 1)),
-          energy_direction_(axis_direction(energy_, 1)) {
+          current_pleasantness_axis_(snapped_axis_coordinate(
+              pleasantness_,
+              mood_axis::positive_1)),
+          current_energy_axis_(snapped_axis_coordinate(
+              energy_,
+              mood_axis::positive_1)),
+          previous_pleasantness_axis_(current_pleasantness_axis_),
+          previous_energy_axis_(current_energy_axis_) {
     }
 
     double pleasantness() const noexcept {
@@ -359,15 +365,19 @@ public:
     }
 
     mood current_mood() const {
-        return mood_at(
-            snapped_axis_coordinate(pleasantness_, pleasantness_direction_),
-            snapped_axis_coordinate(energy_, energy_direction_));
+        return mood_at(current_pleasantness_axis_, current_energy_axis_);
+    }
+
+    mood previous_mood() const {
+        return mood_at(previous_pleasantness_axis_, previous_energy_axis_);
     }
 
     mood_quadrant current_quadrant() const {
-        return quadrant_at(
-            snapped_axis_coordinate(pleasantness_, pleasantness_direction_),
-            snapped_axis_coordinate(energy_, energy_direction_));
+        return quadrant_at(current_pleasantness_axis_, current_energy_axis_);
+    }
+
+    mood_quadrant previous_quadrant() const {
+        return quadrant_at(previous_pleasantness_axis_, previous_energy_axis_);
     }
 
     void set_pleasantness(double value) {
@@ -381,13 +391,23 @@ public:
     void set_position(double pleasantness, double energy) {
         const auto next_pleasantness = clamped_coordinate(pleasantness);
         const auto next_energy = clamped_coordinate(energy);
+
+        const auto next_pleasantness_axis = snapped_axis_coordinate(
+            next_pleasantness,
+            current_pleasantness_axis_);
+        const auto next_energy_axis = snapped_axis_coordinate(
+            next_energy,
+            current_energy_axis_);
+
         const auto previous_mood = current_mood();
         const auto previous_quadrant = current_quadrant();
-
+        
         pleasantness_ = next_pleasantness;
         energy_ = next_energy;
-        pleasantness_direction_ = axis_direction(pleasantness_, pleasantness_direction_);
-        energy_direction_ = axis_direction(energy_, energy_direction_);
+        previous_pleasantness_axis_ = current_pleasantness_axis_;
+        previous_energy_axis_ = current_energy_axis_;
+        current_pleasantness_axis_ = next_pleasantness_axis;
+        current_energy_axis_ = next_energy_axis;
 
         const auto next_mood = current_mood();
         const auto next_quadrant = current_quadrant();
@@ -433,21 +453,9 @@ private:
             emotional_state_max_axis);
     }
 
-    static int axis_direction(double value, int previous_direction) noexcept {
-        if (value < 0.0) {
-            return -1;
-        }
-
-        if (value > 0.0) {
-            return 1;
-        }
-
-        return previous_direction < 0 ? -1 : 1;
-    }
-
-    static mood_axis snapped_axis_coordinate(double value, int direction) noexcept {
+    static mood_axis snapped_axis_coordinate(double value, mood_axis previous_axis) noexcept {
         if (value == 0.0) {
-            return direction < 0 ? mood_axis::negative_1 : mood_axis::positive_1;
+            return previous_axis;
         }
 
         auto snapped = value > 0.0
@@ -464,8 +472,10 @@ private:
 
     double pleasantness_{1.0};
     double energy_{1.0};
-    int pleasantness_direction_{1};
-    int energy_direction_{1};
+    mood_axis current_pleasantness_axis_{mood_axis::positive_1};
+    mood_axis current_energy_axis_{mood_axis::positive_1};
+    mood_axis previous_pleasantness_axis_{mood_axis::positive_1};
+    mood_axis previous_energy_axis_{mood_axis::positive_1};
     mood_changed_callback mood_changed_callback_;
     quadrant_changed_callback quadrant_changed_callback_;
 };

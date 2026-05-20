@@ -170,6 +170,7 @@ TEST_CASE("mood lookup rejects invalid casted mood axes") {
     REQUIRE_THROWS_AS(
         obz::mood_at(obz::mood_axis::positive_1, out_of_range_axis),
         std::invalid_argument);
+
     REQUIRE_THROWS_AS(
         obz::quadrant_at(zero_axis, obz::mood_axis::positive_1),
         std::invalid_argument);
@@ -187,6 +188,7 @@ TEST_CASE("mood quadrants follow pleasantness and energy signs") {
         == obz::mood_quadrant::low_energy_low_pleasantness);
     REQUIRE(obz::quadrant_at(obz::mood_axis::positive_1, obz::mood_axis::negative_1)
         == obz::mood_quadrant::low_energy_high_pleasantness);
+
     REQUIRE(obz::quadrant_of(obz::mood::enraged)
         == obz::mood_quadrant::high_energy_low_pleasantness);
     REQUIRE(obz::quadrant_of(obz::mood::ecstatic)
@@ -208,8 +210,9 @@ TEST_CASE("emotional_state starts from explicit continuous coordinates") {
     REQUIRE(state.pleasantness() == 1.0);
     REQUIRE(state.energy() == 1.0);
     REQUIRE(state.current_mood() == obz::mood::pleasant);
-    REQUIRE(state.current_quadrant()
-        == obz::mood_quadrant::high_energy_high_pleasantness);
+    REQUIRE(state.previous_mood() == obz::mood::pleasant);
+    REQUIRE(state.current_quadrant() == obz::mood_quadrant::high_energy_high_pleasantness);
+    REQUIRE(state.previous_quadrant() == obz::mood_quadrant::high_energy_high_pleasantness);
 }
 
 TEST_CASE("emotional_state clamps continuous coordinates") {
@@ -242,7 +245,7 @@ TEST_CASE("emotional_state snaps small non-zero values to the nearest non-zero m
     REQUIRE(state.current_mood() == obz::mood::peeved);
 }
 
-TEST_CASE("emotional_state favours previous axis direction when continuous coordinates land on zero") {
+TEST_CASE("emotional_state keeps previous finite axes when continuous coordinates land on zero") {
     obz::emotional_state state(-2.0, 3.0);
 
     REQUIRE(state.current_mood() == obz::mood::nervous);
@@ -251,7 +254,26 @@ TEST_CASE("emotional_state favours previous axis direction when continuous coord
 
     REQUIRE(state.pleasantness() == 0.0);
     REQUIRE(state.energy() == 0.0);
-    REQUIRE(state.current_mood() == obz::mood::peeved);
+    REQUIRE(state.previous_mood() == obz::mood::nervous);
+    REQUIRE(state.current_mood() == obz::mood::nervous);
+}
+
+TEST_CASE("emotional_state remembers the previous finite mood interpretation") {
+    obz::emotional_state state(1.0, 1.0);
+
+    state.set_position(3.0, 2.0);
+
+    REQUIRE(state.previous_mood() == obz::mood::pleasant);
+    REQUIRE(state.current_mood() == obz::mood::happy);
+    REQUIRE(state.previous_quadrant() == obz::mood_quadrant::high_energy_high_pleasantness);
+    REQUIRE(state.current_quadrant() == obz::mood_quadrant::high_energy_high_pleasantness);
+
+    state.set_position(-2.0, -2.0);
+
+    REQUIRE(state.previous_mood() == obz::mood::happy);
+    REQUIRE(state.current_mood() == obz::mood::sad);
+    REQUIRE(state.previous_quadrant() == obz::mood_quadrant::high_energy_high_pleasantness);
+    REQUIRE(state.current_quadrant() == obz::mood_quadrant::low_energy_low_pleasantness);
 }
 
 TEST_CASE("emotional_state can update without registered callbacks") {
@@ -303,10 +325,8 @@ TEST_CASE("emotional_state invokes callbacks when mood or quadrant changes") {
     REQUIRE(mood_changes[1].previous == obz::mood::joyful);
     REQUIRE(mood_changes[1].current == obz::mood::uneasy);
     REQUIRE(quadrant_changes.size() == 1);
-    REQUIRE(quadrant_changes[0].previous
-        == obz::mood_quadrant::high_energy_high_pleasantness);
-    REQUIRE(quadrant_changes[0].current
-        == obz::mood_quadrant::high_energy_low_pleasantness);
+    REQUIRE(quadrant_changes[0].previous == obz::mood_quadrant::high_energy_high_pleasantness);
+    REQUIRE(quadrant_changes[0].current == obz::mood_quadrant::high_energy_low_pleasantness);
 }
 
 TEST_CASE("emotional_state stops later callbacks when an earlier callback throws") {
@@ -322,7 +342,6 @@ TEST_CASE("emotional_state stops later callbacks when an earlier callback throws
 
     REQUIRE_THROWS_AS(state.set_position(-1.0, -1.0), std::runtime_error);
     REQUIRE(state.current_mood() == obz::mood::apathetic);
-    REQUIRE(state.current_quadrant()
-        == obz::mood_quadrant::low_energy_low_pleasantness);
+    REQUIRE(state.current_quadrant() == obz::mood_quadrant::low_energy_low_pleasantness);
     REQUIRE_FALSE(quadrant_callback_was_called);
 }

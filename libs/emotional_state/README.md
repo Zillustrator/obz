@@ -153,7 +153,9 @@ public:
     double energy() const noexcept;
 
     mood current_mood() const;
+    mood previous_mood() const;
     mood_quadrant current_quadrant() const;
+    mood_quadrant previous_quadrant() const;
 
     void set_pleasantness(double value);
     void set_energy(double value);
@@ -166,6 +168,8 @@ public:
 ```
 
 Stores continuous pleasantness and energy coordinates as `double` values.
+
+The wrapper also remembers the previous finite mood interpretation from before the most recent successful coordinate update. On construction, the previous mood and current mood are the same.
 
 There is no default constructor. Callers must choose the initial emotional position explicitly because the finite mood grid has no neutral zero state.
 
@@ -244,21 +248,22 @@ packed = ((x + 5) << 4) | (y + 5)
 
 Each axis fits into four bits after biasing by five. This is deliberately simple rather than clever: it makes conversion reversible and keeps the enum values tied to the grid.
 
-The mutable wrapper stores continuous coordinates separately from the previous axis directions used for exact-zero snapping. This keeps two concerns separate:
+The mutable wrapper stores continuous coordinates separately from the current and previous finite mood axes. This keeps two concerns separate:
 
 - `pleasantness()` and `energy()` return the actual continuous state
 - `current_mood()` and `current_quadrant()` return the nearest finite grid interpretation
+- `previous_mood()` and `previous_quadrant()` return the finite interpretation from before the most recent successful coordinate update
 
-The snapped finite coordinates are computed on demand and intentionally not exposed. Callers can read continuous coordinates from `emotional_state` or finite coordinates from a `mood` with `pleasantness_of` and `energy_of`, but they cannot mutate or depend on internal snapping state.
+The snapped finite coordinates are cached internally when the continuous coordinates change and intentionally not exposed. Callers can read continuous coordinates from `emotional_state` or finite coordinates from a `mood` with `pleasantness_of` and `energy_of`, but they cannot mutate or depend on internal snapping state.
 
 Because the finite grid has no zero coordinate, snapping uses one extra rule:
 
 - non-zero values snap to the nearest non-zero integer coordinate
 - small positive values snap to `1`
 - small negative values snap to `-1`
-- an exact `0.0` keeps the previous axis direction
+- an exact `0.0` keeps the previous finite axis value
 
-If a state starts exactly on zero, the default previous direction is positive for that axis.
+If a state starts exactly on zero, the default finite axis value is positive for that axis.
 
 ---
 
@@ -268,7 +273,7 @@ If a state starts exactly on zero, the default previous direction is positive fo
 
 `mood` and `mood_axis` are both `enum class` types, so they do not implicitly convert to integers. Callers must ask for integer axis values through `value_of`.
 
-The quadrant API accepts finite grid coordinates as `mood_axis` values. The wrapper does not expose its internal zero-direction state.
+The quadrant API accepts finite grid coordinates as `mood_axis` values. The wrapper does not expose its cached finite axis state.
 
 `emotional_state` rejects `NaN` and infinity so the clamping rule cannot hide invalid numeric input.
 
@@ -312,7 +317,6 @@ Avoid `emotional_state` when:
 - Nearest-mood lookup from continuous coordinates
 - Multiple callback subscribers
 - Explicit callback clearing helpers
-- Previous-mood and previous-quadrant accessors
 - Compile-time table of all moods for iteration
 
 ---
