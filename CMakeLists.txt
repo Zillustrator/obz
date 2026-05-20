@@ -25,6 +25,7 @@ add_subdirectory(libs/spsc_ring_queue)
 add_subdirectory(libs/mpsc_ring_queue)
 add_subdirectory(libs/weighted_set)
 add_subdirectory(libs/endian)
+add_subdirectory(libs/emotional_state)
 add_subdirectory(libs/transport)
 add_subdirectory(libs/thread_affinity)
 

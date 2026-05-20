@@ -24,6 +24,7 @@ add_executable(obz_tests
     ../libs/mpsc_ring_queue/tests/mpsc_ring_queue_tests.cpp
     ../libs/weighted_set/tests/weighted_set_tests.cpp
     ../libs/endian/tests/endian_tests.cpp
+    ../libs/emotional_state/tests/emotional_state_tests.cpp
     ../libs/transport/tests/transport_tests.cpp
     ../libs/thread_affinity/tests/thread_affinity_tests.cpp
 )
@@ -41,6 +42,7 @@ target_link_libraries(obz_tests
         obz::mpsc_ring_queue
         obz::weighted_set
         obz::endian
+        obz::emotional_state
         obz::transport
         obz::thread_affinity
         Catch2::Catch2WithMain
