@@ -11,15 +11,6 @@ add_library(obz_endian INTERFACE)
 add_library(obz::endian ALIAS obz_endian)
 
 # ------------------------------------------------------------------------------
-# Include directories
-# ------------------------------------------------------------------------------
-
-target_include_directories(obz_endian
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# ------------------------------------------------------------------------------
 # Compile features
 # ------------------------------------------------------------------------------
 
@@ -27,3 +18,5 @@ target_compile_features(obz_endian
     INTERFACE
         cxx_std_20
 )
+
+obz_install_library(obz_endian endian "${CMAKE_CURRENT_SOURCE_DIR}/include")

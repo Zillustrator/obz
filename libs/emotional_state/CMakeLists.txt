@@ -11,15 +11,6 @@ add_library(obz_emotional_state INTERFACE)
 add_library(obz::emotional_state ALIAS obz_emotional_state)
 
 # ------------------------------------------------------------------------------
-# Include directories
-# ------------------------------------------------------------------------------
-
-target_include_directories(obz_emotional_state
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# ------------------------------------------------------------------------------
 # Compile features
 # ------------------------------------------------------------------------------
 
@@ -27,3 +18,5 @@ target_compile_features(obz_emotional_state
     INTERFACE
         cxx_std_20
 )
+
+obz_install_library(obz_emotional_state emotional_state "${CMAKE_CURRENT_SOURCE_DIR}/include")

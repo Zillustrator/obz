@@ -151,6 +151,67 @@ target_link_libraries(my_app
 )
 ```
 
+### Fetch From Git
+
+Use `FetchContent` when a project should build a pinned ObzLib revision directly
+from source:
+
+```cmake
+include(FetchContent)
+
+set(OBZ_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(OBZ_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    obz
+    GIT_REPOSITORY https://github.com/Zillustrator/obz.git
+    GIT_TAG <release-tag-or-commit>
+)
+
+FetchContent_MakeAvailable(obz)
+
+target_link_libraries(my_app
+    PRIVATE
+        obz::blocking_queue
+        obz::transport
+)
+```
+
+Pin a release tag or commit rather than tracking `main`.
+
+### Install And Find The Package
+
+Install ObzLib when consumers should build independently from its source tree:
+
+```bash
+cmake -S . -B build -DOBZ_BUILD_TESTS=OFF
+cmake --build build
+cmake --install build --prefix /path/to/obz-install
+```
+
+The consumer can then use the installed CMake package:
+
+```cmake
+find_package(obz 0.1 CONFIG REQUIRED)
+
+target_link_libraries(my_app
+    PRIVATE
+        obz::blocking_queue
+        obz::transport
+)
+```
+
+Configure the consumer with the install prefix:
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/obz-install
+```
+
+The independent project under `tests/consumer` verifies both source dependency
+and installed-package consumption. It checks that headers, compiled libraries,
+package metadata, and public target names work without relying on ObzLib's
+internal build structure.
+
 ---
 
 ## Status

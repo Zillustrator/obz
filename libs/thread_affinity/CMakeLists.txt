@@ -13,15 +13,6 @@ add_library(obz_thread_affinity
 add_library(obz::thread_affinity ALIAS obz_thread_affinity)
 
 # ------------------------------------------------------------------------------
-# Include directories
-# ------------------------------------------------------------------------------
-
-target_include_directories(obz_thread_affinity
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# ------------------------------------------------------------------------------
 # Compile features
 # ------------------------------------------------------------------------------
 
@@ -58,3 +49,5 @@ else()
             src/platform/unsupported_thread_affinity.cpp
     )
 endif()
+
+obz_install_library(obz_thread_affinity thread_affinity "${CMAKE_CURRENT_SOURCE_DIR}/include")

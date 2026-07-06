@@ -11,15 +11,6 @@ add_library(obz_ring_buffer INTERFACE)
 add_library(obz::ring_buffer ALIAS obz_ring_buffer)
 
 # ------------------------------------------------------------------------------
-# Include directories
-# ------------------------------------------------------------------------------
-
-target_include_directories(obz_ring_buffer
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# ------------------------------------------------------------------------------
 # Compile features
 # ------------------------------------------------------------------------------
 
@@ -27,3 +18,5 @@ target_compile_features(obz_ring_buffer
     INTERFACE
         cxx_std_20
 )
+
+obz_install_library(obz_ring_buffer ring_buffer "${CMAKE_CURRENT_SOURCE_DIR}/include")

@@ -54,3 +54,17 @@ target_link_libraries(obz_tests
 
 include(Catch)
 catch_discover_tests(obz_tests)
+
+add_test(
+    NAME obz_package_consumer
+    COMMAND ${CMAKE_COMMAND}
+        -DOBZ_BINARY_DIR=${CMAKE_BINARY_DIR}
+        -DOBZ_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DOBZ_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/consumer
+        -DOBZ_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/consumer-build
+        -DOBZ_SOURCE_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/source-consumer-build
+        -DOBZ_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/consumer-install
+        -DOBZ_GENERATOR=${CMAKE_GENERATOR}
+        -DOBZ_CONFIG=$<CONFIG>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/verify_consumer.cmake
+)

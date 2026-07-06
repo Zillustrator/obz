@@ -15,15 +15,6 @@ add_library(obz_transport
 add_library(obz::transport ALIAS obz_transport)
 
 # ------------------------------------------------------------------------------
-# Include directories
-# ------------------------------------------------------------------------------
-
-target_include_directories(obz_transport
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# ------------------------------------------------------------------------------
 # Compile features
 # ------------------------------------------------------------------------------
 
@@ -48,3 +39,5 @@ else()
             src/platform/posix_socket_platform.cpp
     )
 endif()
+
+obz_install_library(obz_transport transport "${CMAKE_CURRENT_SOURCE_DIR}/include")
