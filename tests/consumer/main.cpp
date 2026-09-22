@@ -1,4 +1,6 @@
 #include <obz/blocking_queue.hpp>
+#include <obz/spsc_ring_queue.hpp>
+#include <obz/mpsc_ring_queue.hpp>
 #include <obz/endian.hpp>
 #include <obz/thread_affinity.hpp>
 #include <obz/transport.hpp>
@@ -26,6 +28,16 @@ int main() {
     obz::transport::tcp_socket socket;
     if (socket.is_open()) {
         return 3;
+    }
+
+    obz::spsc_ring_queue<int, 4> spsc;
+    if (!spsc.try_push(17) || !spsc.try_pop(value) || value != 17) {
+        return 4;
+    }
+
+    obz::mpsc_ring_queue<int, 4> mpsc;
+    if (!mpsc.try_push(23) || !mpsc.try_pop(value) || value != 23) {
+        return 5;
     }
 
     static_cast<void>(obz::thread_affinity_supported());

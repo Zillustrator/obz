@@ -174,23 +174,31 @@ The queue is implemented using:
 
 ## Cache-Line Considerations
 
-The read and write indices are placed on separate cache lines using:
+The read and write index wrappers use a shared internal alignment policy:
 
 ```cpp
-alignas(std::hardware_destructive_interference_size)
+alignas(obz::detail::destructive_interference_size)
 ```
 
-This prevents **false sharing** between the producer and consumer threads.
+When `__cpp_lib_hardware_interference_size` advertises support, the policy uses
+`std::hardware_destructive_interference_size`. Otherwise it uses a 64-byte
+fallback. This is a separation policy, not runtime cache-line detection; the
+fallback does not guarantee avoidance of false sharing on every processor.
+Only the index wrappers use this policy, not every element in the queue.
 
-Without this separation, updates to `write_index` by the producer and `read_index` by the consumer could invalidate each other's cache lines, significantly degrading performance under contention.
+The separation aims to reduce false sharing. Atomics and memory ordering provide
+synchronisation correctness; padding neither provides correctness nor guarantees
+lock-free atomic operations.
 
-This design ensures that:
+The value affects the queue's alignment, size and member offsets. All translation
+units sharing a queue type must use compatible toolchain and CPU-tuning settings
+that select the same value. GCC's interference-size warning remains visible;
+this policy does not promise stable binary layout across toolchain changes.
+Rebuild consumers consistently when changing those settings.
 
-- the producer primarily writes to one cache line  
-- the consumer primarily writes to another  
-- cache coherency traffic is minimised  
-
-This is particularly important in low-latency and high-throughput systems.
+The CMake queue target supplies the shared header dependency transitively, both
+from source and through the installed package. Manual header consumers must also
+make `libs/detail/include` available (or use the complete installed include tree).
 
 ---
 

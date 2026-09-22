@@ -65,6 +65,7 @@ option(OBZ_BUILD_EXAMPLES "Build obz examples" ON)
 # Libraries
 # ------------------------------------------------------------------------------
 
+add_subdirectory(libs/detail)
 add_subdirectory(libs/blocking_queue)
 add_subdirectory(libs/bounded_blocking_queue)
 add_subdirectory(libs/ring_buffer)

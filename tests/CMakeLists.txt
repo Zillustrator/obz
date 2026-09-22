@@ -55,16 +55,25 @@ target_link_libraries(obz_tests
 include(Catch)
 catch_discover_tests(obz_tests)
 
+set(obz_consumer_osx_architectures "${CMAKE_OSX_ARCHITECTURES}")
+
+if (APPLE AND NOT obz_consumer_osx_architectures)
+    set(obz_consumer_osx_architectures "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+
 add_test(
     NAME obz_package_consumer
-    COMMAND ${CMAKE_COMMAND}
-        -DOBZ_BINARY_DIR=${CMAKE_BINARY_DIR}
-        -DOBZ_SOURCE_DIR=${CMAKE_SOURCE_DIR}
-        -DOBZ_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/consumer
-        -DOBZ_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/consumer-build
-        -DOBZ_SOURCE_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/source-consumer-build
-        -DOBZ_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/consumer-install
-        -DOBZ_GENERATOR=${CMAKE_GENERATOR}
-        -DOBZ_CONFIG=$<CONFIG>
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/verify_consumer.cmake
+    COMMAND "${CMAKE_COMMAND}"
+        "-DOBZ_BINARY_DIR=${CMAKE_BINARY_DIR}"
+        "-DOBZ_SOURCE_DIR=${CMAKE_SOURCE_DIR}"
+        "-DOBZ_CONSUMER_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/consumer"
+        "-DOBZ_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/consumer-build"
+        "-DOBZ_SOURCE_CONSUMER_BINARY_DIR=${CMAKE_CURRENT_BINARY_DIR}/source-consumer-build"
+        "-DOBZ_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/consumer-install"
+        "-DOBZ_GENERATOR=${CMAKE_GENERATOR}"
+        "-DOBZ_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+        "-DOBZ_OSX_ARCHITECTURES=${obz_consumer_osx_architectures}"
+        "-DOBZ_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}"
+        "-DOBZ_CONFIG=$<CONFIG>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_consumer.cmake"
 )

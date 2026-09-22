@@ -350,13 +350,31 @@ The `write_index_` CAS uses relaxed ordering because it only assigns a unique po
 
 ## Cache-Line Considerations
 
-The read and write indices are placed on separate cache lines using:
+The read and write index wrappers use a shared internal alignment policy:
 
 ```cpp
-alignas(std::hardware_destructive_interference_size)
+alignas(obz::detail::destructive_interference_size)
 ```
 
-This helps reduce false sharing between producers updating `write_index_` and the consumer updating `read_index_`.
+When `__cpp_lib_hardware_interference_size` advertises support, the policy uses
+`std::hardware_destructive_interference_size`. Otherwise it uses a 64-byte
+fallback. This is a separation policy, not runtime cache-line detection; the
+fallback does not guarantee avoidance of false sharing on every processor.
+Only the index wrappers use this policy, not every element in the queue.
+
+The separation aims to reduce false sharing. Atomics and memory ordering provide
+synchronisation correctness; padding neither provides correctness nor guarantees
+lock-free atomic operations.
+
+The value affects the queue's alignment, size and member offsets. All translation
+units sharing a queue type must use compatible toolchain and CPU-tuning settings
+that select the same value. GCC's interference-size warning remains visible;
+this policy does not promise stable binary layout across toolchain changes.
+Rebuild consumers consistently when changing those settings.
+
+The CMake queue target supplies the shared header dependency transitively, both
+from source and through the installed package. Manual header consumers must also
+make `libs/detail/include` available (or use the complete installed include tree).
 
 ---
 

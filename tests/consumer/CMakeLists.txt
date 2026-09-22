@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 
 project(obz_consumer LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(OBZ_CONSUMER_USE_FETCHCONTENT "Consume ObzLib from source using FetchContent" OFF)
 
 if (OBZ_CONSUMER_USE_FETCHCONTENT)
@@ -30,6 +32,8 @@ add_executable(obz_consumer
 
 target_link_libraries(obz_consumer
     PRIVATE
+        obz::spsc_ring_queue
+        obz::mpsc_ring_queue
         obz::blocking_queue
         obz::endian
         obz::thread_affinity
