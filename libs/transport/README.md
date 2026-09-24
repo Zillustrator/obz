@@ -13,6 +13,7 @@ This library solves one narrow problem: moving bytes between IPv4 endpoints whil
 - TCP listener with `accept`
 - UDP socket with `send_to` and `receive_from`
 - TCP `send_all` helper for complete buffer writes
+- TCP `receive_some` and `receive_exactly` operations using caller-owned storage
 - RAII close in destructors
 - `std::system_error` for operating-system socket failures
 - Byte-oriented APIs using `std::byte` and `std::span`
@@ -100,13 +101,24 @@ public:
 ### tcp_socket
 
 ```cpp
+enum class receive_status {
+    completed,
+    peer_closed,
+};
+
+struct receive_result {
+    std::size_t bytes_received{0};
+    receive_status status{receive_status::peer_closed};
+};
+
 class tcp_socket {
 public:
     void connect(const endpoint& remote_endpoint);
 
     std::size_t send(std::span<const std::byte> data);
     void send_all(std::span<const std::byte> data);
-    std::vector<std::byte> receive(std::size_t max_bytes = 4096);
+    receive_result receive_some(std::span<std::byte> destination);
+    receive_result receive_exactly(std::span<std::byte> destination);
 
     void close();
 
@@ -116,9 +128,30 @@ public:
 };
 ```
 
-`send` and `receive` are byte-oriented wrappers over native socket operations. A single `send` may write fewer bytes than requested.
+`send` and `receive_some` are byte-oriented wrappers over native socket operations. A single call may transfer fewer bytes than the supplied span contains.
 
 `send_all` repeatedly calls `send` until the full span has been written, or throws if the socket reports failure.
+
+`receive_some` performs one blocking receive into caller-owned storage. A completed result contains a positive byte count no greater than the destination size. `peer_closed` contains a zero byte count.
+
+`receive_exactly` repeatedly receives until it fills the destination. If the peer closes first, its result reports `peer_closed` and the number of bytes placed in the destination before closure.
+
+Both receive operations reject an empty destination with `std::invalid_argument`. Native socket failures throw `std::system_error`.
+
+```cpp
+std::array<std::byte, 8> header_bytes{};
+const auto result = socket.receive_exactly(header_bytes);
+
+if (result.status == obz::transport::receive_status::peer_closed) {
+    if (result.bytes_received == 0) {
+        // The peer closed before the next header began.
+    } else {
+        // The peer closed partway through the header.
+    }
+}
+```
+
+The transport layer reports closure and transferred bytes without assigning protocol meaning. A framing layer can treat closure before a new header as a normal end of stream and closure within a header or payload as an unexpected end of a message.
 
 ---
 
@@ -148,6 +181,8 @@ public:
 |-----------|---------------|------------|
 | socket operation before open | throws `std::runtime_error` | n/a |
 | bind/connect/send/receive/listen/accept | n/a | throws `std::system_error` |
+| receive with an empty destination | throws `std::invalid_argument` | n/a |
+| peer closes during receive | returns `receive_status::peer_closed` | n/a |
 | close | idempotent | ignored |
 
 ---
@@ -165,6 +200,8 @@ Use each socket from one thread at a time, or provide external synchronization a
 The classes are move-only because each object owns one native socket handle.
 
 The public API uses `native_socket_handle` instead of exposing POSIX file descriptors directly. On POSIX the handle is an `int`; on Windows it is represented by a pointer-sized unsigned integer compatible with Winsock `SOCKET` values.
+
+Receive operations use caller-owned spans so callers can choose and reuse storage without requiring the socket to own a buffer or allocate on every call. Returned results make orderly peer closure explicit; they do not treat it as an operating-system failure.
 
 `local_endpoint()` is provided so callers and tests can bind to port `0` and discover the actual ephemeral port chosen by the operating system.
 

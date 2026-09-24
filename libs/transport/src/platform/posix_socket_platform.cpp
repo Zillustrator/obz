@@ -137,16 +137,14 @@ std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> dat
     return static_cast<std::size_t>(bytes_sent);
 }
 
-std::vector<std::byte> receive_tcp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
-    const auto bytes_received = ::recv(handle, buffer.data(), buffer.size(), 0);
+std::size_t receive_tcp(native_socket_handle handle, std::span<std::byte> destination) {
+    const auto bytes_received = ::recv(handle, destination.data(), destination.size(), 0);
 
     if (bytes_received < 0) {
         throw last_socket_error("failed to receive TCP data");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return buffer;
+    return static_cast<std::size_t>(bytes_received);
 }
 
 std::size_t send_udp(

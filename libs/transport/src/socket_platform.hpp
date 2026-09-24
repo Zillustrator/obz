@@ -28,7 +28,7 @@ void listen_socket(native_socket_handle handle, int backlog);
 native_socket_handle accept_socket(native_socket_handle handle);
 
 std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> data);
-std::vector<std::byte> receive_tcp(native_socket_handle handle, std::size_t max_bytes);
+std::size_t receive_tcp(native_socket_handle handle, std::span<std::byte> destination);
 
 std::size_t send_udp(
     native_socket_handle handle,

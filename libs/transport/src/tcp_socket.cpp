@@ -65,16 +65,42 @@ void tcp_socket::send_all(std::span<const std::byte> data) {
     }
 }
 
-std::vector<std::byte> tcp_socket::receive(std::size_t max_bytes) {
+receive_result tcp_socket::receive_some(std::span<std::byte> destination) {
+    if (destination.empty()) {
+        throw std::invalid_argument("TCP receive destination must not be empty");
+    }
+
     if (!is_open()) {
         throw std::runtime_error("TCP socket is not open");
     }
 
-    if (max_bytes == 0) {
-        return {};
+    const auto bytes_received = detail::receive_tcp(socket_handle_, destination);
+
+    if (bytes_received == 0) {
+        return receive_result{0, receive_status::peer_closed};
     }
 
-    return detail::receive_tcp(socket_handle_, max_bytes);
+    return receive_result{bytes_received, receive_status::completed};
+}
+
+receive_result tcp_socket::receive_exactly(std::span<std::byte> destination) {
+    if (destination.empty()) {
+        throw std::invalid_argument("TCP receive destination must not be empty");
+    }
+
+    std::size_t total_received = 0;
+
+    while (total_received < destination.size()) {
+        const auto result = receive_some(destination.subspan(total_received));
+
+        if (result.status == receive_status::peer_closed) {
+            return receive_result{total_received, receive_status::peer_closed};
+        }
+
+        total_received += result.bytes_received;
+    }
+
+    return receive_result{total_received, receive_status::completed};
 }
 
 void tcp_socket::close() {
