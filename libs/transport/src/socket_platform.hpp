@@ -6,8 +6,6 @@
 
 #include <cstddef>
 #include <span>
-#include <string>
-#include <system_error>
 #include <vector>
 
 namespace obz::transport::detail {
@@ -16,7 +14,6 @@ native_socket_handle invalid_socket() noexcept;
 bool is_valid(native_socket_handle handle) noexcept;
 
 void close_socket(native_socket_handle handle) noexcept;
-std::system_error last_socket_error(const std::string& message);
 
 native_socket_handle create_tcp_socket();
 native_socket_handle create_udp_socket();

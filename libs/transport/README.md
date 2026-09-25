@@ -141,6 +141,8 @@ Sending after a connection has broken throws `std::system_error`. On Linux the b
 
 Both receive operations reject an empty destination with `std::invalid_argument`. Native socket failures throw `std::system_error`.
 
+On POSIX, an interrupted blocking operation is reported as `std::system_error` with `std::errc::interrupted`. The library does not retry automatically because a signal may be the application's mechanism for requesting shutdown. Callers can choose whether retrying is correct for their operation and shutdown policy.
+
 ```cpp
 std::array<std::byte, 8> header_bytes{};
 const auto result = socket.receive_exactly(header_bytes);
@@ -220,6 +222,10 @@ The public socket classes are shared across platforms. Platform-specific socket 
 - Windows builds compile `src/platform/win32_socket_platform.cpp` and link `ws2_32`
 
 The platform layer owns native socket creation, close semantics, address conversion, error conversion, and Winsock startup on Windows.
+
+Each backend captures `errno` or `WSAGetLastError()` immediately after a failed native call, before constructing messages or performing cleanup that could replace the original error code.
+
+`close()` remains idempotent and non-throwing. The POSIX backend does not retry an interrupted `close()` because the descriptor may already have been released and reused for another resource.
 
 Winsock reports broken sends through its normal error return and does not use `SIGPIPE`.
 

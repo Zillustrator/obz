@@ -12,11 +12,16 @@
 #include <thread>
 #include <vector>
 
-#if defined(__linux__)
-#include <cerrno>
+#if !defined(_WIN32)
+#include <signal.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+
+#if defined(__linux__)
+#include <cerrno>
 #endif
 
 namespace {
@@ -236,6 +241,56 @@ TEST_CASE("transport tcp_socket send_all rejects unopened sockets") {
 
     REQUIRE_THROWS_AS(socket.send_all(payload), std::runtime_error);
 }
+
+#if !defined(_WIN32)
+TEST_CASE("transport tcp_socket reports an interrupted blocking receive") {
+    const auto child = ::fork();
+
+    REQUIRE(child >= 0);
+
+    if (child == 0) {
+        struct sigaction action {};
+        action.sa_handler = [](int) {};
+        sigemptyset(&action.sa_mask);
+
+        if (::sigaction(SIGALRM, &action, nullptr) != 0) {
+            ::_exit(1);
+        }
+
+        int handles[2]{};
+
+        if (::socketpair(AF_UNIX, SOCK_STREAM, 0, handles) != 0) {
+            ::_exit(2);
+        }
+
+        struct itimerval timer {};
+        timer.it_value.tv_usec = 10'000;
+
+        if (::setitimer(ITIMER_REAL, &timer, nullptr) != 0) {
+            ::_exit(3);
+        }
+
+        obz::transport::tcp_socket socket{handles[0]};
+        std::array<std::byte, 1> destination{};
+
+        try {
+            static_cast<void>(socket.receive_some(destination));
+        } catch (const std::system_error& error) {
+            const auto interrupted = std::make_error_code(std::errc::interrupted);
+            ::_exit(error.code() == interrupted ? 0 : 4);
+        } catch (...) {
+            ::_exit(5);
+        }
+
+        ::_exit(6);
+    }
+
+    int child_status{};
+    REQUIRE(::waitpid(child, &child_status, 0) == child);
+    REQUIRE(WIFEXITED(child_status));
+    REQUIRE(WEXITSTATUS(child_status) == 0);
+}
+#endif
 
 #if defined(__linux__)
 TEST_CASE("transport tcp_socket reports a broken send without terminating the process") {

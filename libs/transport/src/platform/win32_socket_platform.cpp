@@ -11,11 +11,22 @@
 #include <limits>
 #include <mutex>
 #include <stdexcept>
+#include <string>
+#include <system_error>
 #include <utility>
 
 namespace obz::transport::detail {
 
 namespace {
+
+std::system_error socket_error(int error_code, const std::string& message) {
+    return std::system_error(error_code, std::system_category(), message);
+}
+
+std::system_error last_socket_error(const char* message) {
+    const auto error_code = ::WSAGetLastError();
+    return socket_error(error_code, message);
+}
 
 SOCKET to_socket(native_socket_handle handle) noexcept {
     return static_cast<SOCKET>(handle);
@@ -92,10 +103,6 @@ void close_socket(native_socket_handle handle) noexcept {
     }
 }
 
-std::system_error last_socket_error(const std::string& message) {
-    return std::system_error(::WSAGetLastError(), std::system_category(), message);
-}
-
 native_socket_handle create_tcp_socket() {
     ensure_winsock_started();
 
@@ -125,7 +132,9 @@ void connect_socket(native_socket_handle handle, const endpoint& remote_endpoint
 
     if (::connect(to_socket(handle), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) ==
         SOCKET_ERROR) {
-        throw last_socket_error(
+        const auto error_code = ::WSAGetLastError();
+        throw socket_error(
+            error_code,
             "failed to connect to " + remote_endpoint.host + ":" +
             std::to_string(remote_endpoint.port));
     }
@@ -136,7 +145,9 @@ void bind_socket(native_socket_handle handle, const endpoint& local_endpoint) {
 
     if (::bind(to_socket(handle), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) ==
         SOCKET_ERROR) {
-        throw last_socket_error(
+        const auto error_code = ::WSAGetLastError();
+        throw socket_error(
+            error_code,
             "failed to bind socket to " + local_endpoint.host + ":" +
             std::to_string(local_endpoint.port));
     }
