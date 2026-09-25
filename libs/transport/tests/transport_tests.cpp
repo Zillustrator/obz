@@ -12,6 +12,13 @@
 #include <thread>
 #include <vector>
 
+#if defined(__linux__)
+#include <cerrno>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 namespace {
 
 std::vector<std::byte> bytes(std::initializer_list<std::uint8_t> values) {
@@ -229,3 +236,39 @@ TEST_CASE("transport tcp_socket send_all rejects unopened sockets") {
 
     REQUIRE_THROWS_AS(socket.send_all(payload), std::runtime_error);
 }
+
+#if defined(__linux__)
+TEST_CASE("transport tcp_socket reports a broken send without terminating the process") {
+    const auto child = ::fork();
+
+    REQUIRE(child >= 0);
+
+    if (child == 0) {
+        int handles[2]{};
+
+        if (::socketpair(AF_UNIX, SOCK_STREAM, 0, handles) != 0) {
+            ::_exit(1);
+        }
+
+        ::close(handles[1]);
+
+        obz::transport::tcp_socket socket{handles[0]};
+        const std::array payload{std::byte{1}};
+
+        try {
+            static_cast<void>(socket.send(payload));
+        } catch (const std::system_error& error) {
+            ::_exit(error.code().value() == EPIPE ? 0 : 2);
+        } catch (...) {
+            ::_exit(3);
+        }
+
+        ::_exit(4);
+    }
+
+    int child_status{};
+    REQUIRE(::waitpid(child, &child_status, 0) == child);
+    REQUIRE(WIFEXITED(child_status));
+    REQUIRE(WEXITSTATUS(child_status) == 0);
+}
+#endif

@@ -38,6 +38,28 @@ endpoint from_sockaddr_in(const sockaddr_in& address) {
     return endpoint{std::string(host), ntohs(address.sin_port)};
 }
 
+native_socket_handle configure_tcp_socket(native_socket_handle handle) {
+#if defined(__APPLE__)
+    int no_sigpipe = 1;
+
+    if (::setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe)) < 0) {
+        const auto error = last_socket_error("failed to disable SIGPIPE on TCP socket");
+        ::close(handle);
+        throw error;
+    }
+#endif
+
+    return handle;
+}
+
+int tcp_send_flags() noexcept {
+#if defined(MSG_NOSIGNAL)
+    return MSG_NOSIGNAL;
+#else
+    return 0;
+#endif
+}
+
 } // namespace
 
 native_socket_handle invalid_socket() noexcept {
@@ -65,7 +87,7 @@ native_socket_handle create_tcp_socket() {
         throw last_socket_error("failed to create TCP socket");
     }
 
-    return handle;
+    return configure_tcp_socket(handle);
 }
 
 native_socket_handle create_udp_socket() {
@@ -124,11 +146,11 @@ native_socket_handle accept_socket(native_socket_handle handle) {
         throw last_socket_error("failed to accept TCP connection");
     }
 
-    return client_handle;
+    return configure_tcp_socket(client_handle);
 }
 
 std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> data) {
-    const auto bytes_sent = ::send(handle, data.data(), data.size(), 0);
+    const auto bytes_sent = ::send(handle, data.data(), data.size(), tcp_send_flags());
 
     if (bytes_sent < 0) {
         throw last_socket_error("failed to send TCP data");

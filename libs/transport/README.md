@@ -16,6 +16,7 @@ This library solves one narrow problem: moving bytes between IPv4 endpoints whil
 - TCP `receive_some` and `receive_exactly` operations using caller-owned storage
 - RAII close in destructors
 - `std::system_error` for operating-system socket failures
+- Broken TCP sends report errors without allowing POSIX `SIGPIPE` to terminate the process
 - Byte-oriented APIs using `std::byte` and `std::span`
 - POSIX backend, with a Windows Winsock backend selected by CMake on Windows
 
@@ -132,6 +133,8 @@ public:
 
 `send_all` repeatedly calls `send` until the full span has been written, or throws if the socket reports failure.
 
+Sending after a connection has broken throws `std::system_error`. On Linux the backend uses `MSG_NOSIGNAL` for each TCP send. On macOS it configures created and accepted TCP sockets with `SO_NOSIGPIPE`. This prevents the default `SIGPIPE` action from terminating the process without changing the application's process-wide signal policy.
+
 `receive_some` performs one blocking receive into caller-owned storage. A completed result contains a positive byte count no greater than the destination size. `peer_closed` contains a zero byte count.
 
 `receive_exactly` repeatedly receives until it fills the destination. If the peer closes first, its result reports `peer_closed` and the number of bytes placed in the destination before closure.
@@ -217,6 +220,8 @@ The public socket classes are shared across platforms. Platform-specific socket 
 - Windows builds compile `src/platform/win32_socket_platform.cpp` and link `ws2_32`
 
 The platform layer owns native socket creation, close semantics, address conversion, error conversion, and Winsock startup on Windows.
+
+Winsock reports broken sends through its normal error return and does not use `SIGPIPE`.
 
 This keeps the user-facing API stable while letting CMake select the platform backend.
 
