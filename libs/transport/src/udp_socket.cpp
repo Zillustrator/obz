@@ -54,16 +54,16 @@ std::size_t udp_socket::send_to(const endpoint& remote_endpoint, std::span<const
     return detail::send_udp(socket_handle_, remote_endpoint, data);
 }
 
-datagram udp_socket::receive_from(std::size_t max_bytes) {
+udp_receive_result udp_socket::receive_from(std::span<std::byte> destination) {
     if (!is_open()) {
         throw std::runtime_error("UDP socket is not open");
     }
 
-    if (max_bytes == 0) {
-        throw std::invalid_argument("UDP receive size must be greater than zero");
+    if (destination.empty()) {
+        throw std::invalid_argument("UDP receive destination must not be empty");
     }
 
-    return detail::receive_udp(socket_handle_, max_bytes);
+    return detail::receive_udp(socket_handle_, destination);
 }
 
 void udp_socket::close() {

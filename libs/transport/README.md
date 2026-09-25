@@ -55,7 +55,12 @@ int main() {
 
     sender.send_to({"127.0.0.1", 9000}, payload);
 
-    const auto datagram = receiver.receive_from();
+    std::array<std::byte, 4096> receive_buffer{};
+    const auto result = receiver.receive_from(receive_buffer);
+
+    if (result.status == obz::transport::datagram_status::truncated) {
+        return 1;
+    }
 }
 ```
 
@@ -79,13 +84,24 @@ Represents an IPv4 endpoint.
 ### udp_socket
 
 ```cpp
+enum class datagram_status {
+    complete,
+    truncated,
+};
+
+struct udp_receive_result {
+    endpoint sender;
+    std::size_t bytes_received;
+    datagram_status status;
+};
+
 class udp_socket {
 public:
     void open();
     void bind(const endpoint& local_endpoint);
 
     std::size_t send_to(const endpoint& remote_endpoint, std::span<const std::byte> data);
-    datagram receive_from(std::size_t max_bytes = 4096);
+    udp_receive_result receive_from(std::span<std::byte> destination);
 
     void close();
 
@@ -95,7 +111,11 @@ public:
 };
 ```
 
-`receive_from` blocks until one datagram is received.
+`receive_from` blocks until one datagram is received and writes into caller-owned storage. A
+complete result may contain zero bytes because UDP permits empty datagrams. If the datagram is
+larger than the destination, the result is `truncated`, `bytes_received` equals the bytes retained
+in the destination, and the remainder of that datagram has been discarded by the operating system.
+The next receive starts with the next datagram.
 
 ---
 

@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <span>
-#include <vector>
 
 namespace obz::transport::detail {
 
@@ -31,7 +30,9 @@ std::size_t send_udp(
     native_socket_handle handle,
     const endpoint& remote_endpoint,
     std::span<const std::byte> data);
-datagram receive_udp(native_socket_handle handle, std::size_t max_bytes);
+udp_receive_result receive_udp(
+    native_socket_handle handle,
+    std::span<std::byte> destination);
 
 endpoint local_endpoint_for(native_socket_handle handle);
 

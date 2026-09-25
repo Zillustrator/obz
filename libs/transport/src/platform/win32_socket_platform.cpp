@@ -230,25 +230,37 @@ std::size_t send_udp(
     return static_cast<std::size_t>(bytes_sent);
 }
 
-datagram receive_udp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
+udp_receive_result receive_udp(
+    native_socket_handle handle,
+    std::span<std::byte> destination) {
     sockaddr_in sender_address{};
     int sender_address_size = sizeof(sender_address);
 
     const auto bytes_received = ::recvfrom(
         to_socket(handle),
-        reinterpret_cast<char*>(buffer.data()),
-        checked_socket_size(buffer.size()),
+        reinterpret_cast<char*>(destination.data()),
+        checked_socket_size(destination.size()),
         0,
         reinterpret_cast<sockaddr*>(&sender_address),
         &sender_address_size);
 
     if (bytes_received == SOCKET_ERROR) {
-        throw last_socket_error("failed to receive UDP datagram");
+        const auto error_code = ::WSAGetLastError();
+
+        if (error_code == WSAEMSGSIZE) {
+            return udp_receive_result{
+                from_sockaddr_in(sender_address),
+                destination.size(),
+                datagram_status::truncated};
+        }
+
+        throw socket_error(error_code, "failed to receive UDP datagram");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return datagram{from_sockaddr_in(sender_address), std::move(buffer)};
+    return udp_receive_result{
+        from_sockaddr_in(sender_address),
+        static_cast<std::size_t>(bytes_received),
+        datagram_status::complete};
 }
 
 endpoint local_endpoint_for(native_socket_handle handle) {

@@ -2,16 +2,21 @@
 
 #include <cstddef>
 #include <span>
-#include <vector>
 
 #include <obz/transport/endpoint.hpp>
 #include <obz/transport/native_handle.hpp>
 
 namespace obz::transport {
 
-struct datagram {
+enum class datagram_status {
+    complete,
+    truncated,
+};
+
+struct udp_receive_result {
     endpoint sender;
-    std::vector<std::byte> payload;
+    std::size_t bytes_received{0};
+    datagram_status status{datagram_status::complete};
 };
 
 class udp_socket {
@@ -30,7 +35,7 @@ public:
     void bind(const endpoint& local_endpoint);
 
     std::size_t send_to(const endpoint& remote_endpoint, std::span<const std::byte> data);
-    datagram receive_from(std::size_t max_bytes = 4096);
+    udp_receive_result receive_from(std::span<std::byte> destination);
 
     void close();
 

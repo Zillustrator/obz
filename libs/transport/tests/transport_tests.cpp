@@ -72,17 +72,48 @@ TEST_CASE("transport udp_socket sends and receives datagrams on localhost") {
 
     REQUIRE(sender.send_to(receiver.local_endpoint(), payload) == payload.size());
 
-    const auto datagram = receiver.receive_from(1024);
+    std::array<std::byte, 1024> destination{};
+    const auto result = receiver.receive_from(destination);
 
-    require_bytes_equal(datagram.payload, payload);
-    REQUIRE(datagram.sender.port != 0);
+    REQUIRE(result.status == obz::transport::datagram_status::complete);
+    REQUIRE(result.bytes_received == payload.size());
+    require_bytes_equal(
+        std::span<const std::byte>{destination}.first(result.bytes_received), payload);
+    REQUIRE(result.sender.port != 0);
 }
 
-TEST_CASE("transport udp_socket rejects invalid receive size") {
+TEST_CASE("transport udp_socket rejects an empty receive destination") {
     obz::transport::udp_socket socket;
     socket.open();
 
-    REQUIRE_THROWS_AS(socket.receive_from(0), std::invalid_argument);
+    REQUIRE_THROWS_AS(socket.receive_from(std::span<std::byte>{}), std::invalid_argument);
+}
+
+TEST_CASE("transport udp_socket reports truncated datagrams") {
+    obz::transport::udp_socket receiver;
+
+    try {
+        receiver.bind({"127.0.0.1", 0});
+    } catch (const std::system_error& error) {
+        if (is_operation_not_permitted(error)) {
+            SKIP("localhost UDP bind is not permitted in this environment");
+        }
+
+        throw;
+    }
+
+    obz::transport::udp_socket sender;
+    sender.open();
+
+    const auto payload = bytes({1, 2, 3, 4});
+    REQUIRE(sender.send_to(receiver.local_endpoint(), payload) == payload.size());
+
+    std::array<std::byte, 2> destination{};
+    const auto result = receiver.receive_from(destination);
+
+    REQUIRE(result.status == obz::transport::datagram_status::truncated);
+    REQUIRE(result.bytes_received == destination.size());
+    require_bytes_equal(destination, std::span<const std::byte>{payload}.first(destination.size()));
 }
 
 TEST_CASE("transport tcp_listener accepts a tcp_socket connection on localhost") {
