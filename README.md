@@ -120,6 +120,28 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug \
 cmake --build build
 ```
 
+### Build With ASan And UBSan
+
+GCC and Clang builds can enable AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```bash
+cmake -S . -B build-sanitized \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DOBZ_BUILD_TESTS=ON \
+  -DOBZ_BUILD_EXAMPLES=OFF \
+  -DOBZ_ENABLE_ASAN_UBSAN=ON
+cmake --build build-sanitized
+ctest --test-dir build-sanitized \
+  --exclude-regex '^obz_package_consumer$' \
+  --output-on-failure
+```
+
+The sanitizer flags are private development instrumentation and are not part of
+the installed targets' usage requirements. The package-consumer test is omitted
+from this build because an executable that links a sanitized static library must
+also link the sanitizer runtime. Run the normal unsanitized suite to validate
+installed-package and `FetchContent` consumption.
+
 ---
 
 ## Running Tests

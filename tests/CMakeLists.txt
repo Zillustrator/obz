@@ -48,15 +48,26 @@ target_link_libraries(obz_tests
         Catch2::Catch2WithMain
 )
 
+if (OBZ_ENABLE_ASAN_UBSAN)
+    obz_enable_asan_ubsan(obz_tests)
+endif()
+
 # ------------------------------------------------------------------------------
 # CTest integration
 # ------------------------------------------------------------------------------
 
 include(Catch)
+
+set(obz_test_timeout 10)
+
+if (OBZ_ENABLE_ASAN_UBSAN)
+    set(obz_test_timeout 60)
+endif()
+
 catch_discover_tests(
     obz_tests
     PROPERTIES
-        TIMEOUT 10
+        TIMEOUT ${obz_test_timeout}
 )
 
 set(obz_consumer_osx_architectures "${CMAKE_OSX_ARCHITECTURES}")
