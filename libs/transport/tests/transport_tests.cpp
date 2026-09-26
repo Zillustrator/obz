@@ -10,18 +10,17 @@
 #include <stdexcept>
 #include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #if !defined(_WIN32)
+#include <cerrno>
+#include <fcntl.h>
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
-
-#if defined(__linux__)
-#include <cerrno>
 #endif
 
 namespace {
@@ -48,6 +47,37 @@ void require_bytes_equal(std::span<const std::byte> actual, std::span<const std:
 
 bool is_operation_not_permitted(const std::system_error& error) {
     return error.code() == std::make_error_code(std::errc::operation_not_permitted);
+}
+
+template <typename Socket, typename OpenSocket>
+void require_move_ownership(OpenSocket open_socket) {
+    Socket source;
+    open_socket(source);
+    const auto source_handle = source.native_handle();
+
+    Socket move_constructed{std::move(source)};
+
+    REQUIRE_FALSE(source.is_open());
+    REQUIRE(move_constructed.is_open());
+    REQUIRE(move_constructed.native_handle() == source_handle);
+
+    Socket move_assigned;
+    open_socket(move_assigned);
+    const auto replaced_handle = move_assigned.native_handle();
+
+    move_assigned = std::move(move_constructed);
+
+    REQUIRE_FALSE(move_constructed.is_open());
+    REQUIRE(move_assigned.is_open());
+    REQUIRE(move_assigned.native_handle() == source_handle);
+
+#if !defined(_WIN32)
+    errno = 0;
+    REQUIRE(::fcntl(replaced_handle, F_GETFD) == -1);
+    REQUIRE(errno == EBADF);
+#else
+    static_cast<void>(replaced_handle);
+#endif
 }
 
 } // namespace
@@ -300,6 +330,25 @@ TEST_CASE("transport sockets report open state and close idempotently") {
     socket.close();
 
     REQUIRE_FALSE(socket.is_open());
+}
+
+TEST_CASE("transport udp_socket moves native handle ownership") {
+    require_move_ownership<obz::transport::udp_socket>(
+        [](obz::transport::udp_socket& socket) { socket.open(); });
+}
+
+TEST_CASE("transport tcp_listener moves native handle ownership") {
+    require_move_ownership<obz::transport::tcp_listener>(
+        [](obz::transport::tcp_listener& listener) { listener.listen({"127.0.0.1", 0}); });
+}
+
+TEST_CASE("transport tcp_socket moves native handle ownership") {
+    obz::transport::tcp_listener listener;
+    listener.listen({"127.0.0.1", 0});
+    const auto endpoint = listener.local_endpoint();
+
+    require_move_ownership<obz::transport::tcp_socket>(
+        [&endpoint](obz::transport::tcp_socket& socket) { socket.connect(endpoint); });
 }
 
 TEST_CASE("transport tcp_socket send_all rejects unopened sockets") {
