@@ -53,7 +53,11 @@ target_link_libraries(obz_tests
 # ------------------------------------------------------------------------------
 
 include(Catch)
-catch_discover_tests(obz_tests)
+catch_discover_tests(
+    obz_tests
+    PROPERTIES
+        TIMEOUT 10
+)
 
 set(obz_consumer_osx_architectures "${CMAKE_OSX_ARCHITECTURES}")
 
@@ -77,3 +81,5 @@ add_test(
         "-DOBZ_CONFIG=$<CONFIG>"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/verify_consumer.cmake"
 )
+
+set_tests_properties(obz_package_consumer PROPERTIES TIMEOUT 120)

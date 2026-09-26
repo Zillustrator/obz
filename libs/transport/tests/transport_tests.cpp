@@ -5,11 +5,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <span>
 #include <stdexcept>
 #include <system_error>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -199,38 +197,19 @@ TEST_CASE("transport tcp_listener accepts a tcp_socket connection on localhost")
     const auto request = bytes({10, 20, 30});
     const auto response = bytes({40, 50});
 
-    std::array<std::byte, 3> server_received{};
-    obz::transport::receive_result server_receive_result{0, obz::transport::receive_status::peer_closed};
-    std::size_t server_bytes_sent = 0;
-    std::exception_ptr server_error;
-
-    std::thread server([&] {
-        try {
-            auto socket = listener.accept();
-
-            server_receive_result = socket.receive_exactly(server_received);
-            socket.send_all(response);
-            server_bytes_sent = response.size();
-        } catch (...) {
-            server_error = std::current_exception();
-        }
-    });
-
     obz::transport::tcp_socket client;
     client.connect(listener_endpoint);
+    auto server = listener.accept();
 
     client.send_all(request);
+
+    std::array<std::byte, 3> server_received{};
+    const auto server_receive_result = server.receive_exactly(server_received);
+    server.send_all(response);
 
     std::array<std::byte, 2> client_received{};
     const auto client_receive_result = client.receive_exactly(client_received);
 
-    server.join();
-
-    if (server_error) {
-        std::rethrow_exception(server_error);
-    }
-
-    REQUIRE(server_bytes_sent == response.size());
     REQUIRE(server_receive_result.status == obz::transport::receive_status::completed);
     REQUIRE(server_receive_result.bytes_received == server_received.size());
     REQUIRE(client_receive_result.status == obz::transport::receive_status::completed);
@@ -243,26 +222,13 @@ TEST_CASE("transport tcp_socket reports peer closure before receiving bytes") {
     obz::transport::tcp_listener listener;
     listener.listen({"127.0.0.1", 0});
 
-    std::exception_ptr server_error;
-    std::thread server([&] {
-        try {
-            const auto socket = listener.accept();
-        } catch (...) {
-            server_error = std::current_exception();
-        }
-    });
-
     obz::transport::tcp_socket client;
     client.connect(listener.local_endpoint());
+    auto server = listener.accept();
+    server.close();
 
     std::array<std::byte, 4> destination{};
     const auto result = client.receive_some(destination);
-
-    server.join();
-
-    if (server_error) {
-        std::rethrow_exception(server_error);
-    }
 
     REQUIRE(result.status == obz::transport::receive_status::peer_closed);
     REQUIRE(result.bytes_received == 0);
@@ -273,27 +239,14 @@ TEST_CASE("transport tcp_socket reports bytes received before peer closure") {
     listener.listen({"127.0.0.1", 0});
 
     const auto partial_payload = bytes({1, 2});
-    std::exception_ptr server_error;
-    std::thread server([&] {
-        try {
-            auto socket = listener.accept();
-            socket.send_all(partial_payload);
-        } catch (...) {
-            server_error = std::current_exception();
-        }
-    });
-
     obz::transport::tcp_socket client;
     client.connect(listener.local_endpoint());
+    auto server = listener.accept();
+    server.send_all(partial_payload);
+    server.close();
 
     std::array<std::byte, 4> destination{};
     const auto result = client.receive_exactly(destination);
-
-    server.join();
-
-    if (server_error) {
-        std::rethrow_exception(server_error);
-    }
 
     REQUIRE(result.status == obz::transport::receive_status::peer_closed);
     REQUIRE(result.bytes_received == partial_payload.size());
