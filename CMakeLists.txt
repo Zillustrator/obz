@@ -60,11 +60,35 @@ endfunction()
 
 option(OBZ_BUILD_TESTS "Build obz tests" ON)
 option(OBZ_BUILD_EXAMPLES "Build obz examples" ON)
+option(OBZ_ENABLE_ASAN_UBSAN "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+if (OBZ_ENABLE_ASAN_UBSAN)
+    if (NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
+        message(FATAL_ERROR "OBZ_ENABLE_ASAN_UBSAN requires GCC or Clang")
+    endif()
+
+    function(obz_enable_asan_ubsan target)
+        target_compile_options(${target}
+            PRIVATE
+                -fsanitize=address,undefined
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=undefined
+        )
+
+        target_link_options(${target}
+            PRIVATE
+                -fsanitize=address,undefined
+                -fno-omit-frame-pointer
+                -fno-sanitize-recover=undefined
+        )
+    endfunction()
+endif()
 
 # ------------------------------------------------------------------------------
 # Libraries
 # ------------------------------------------------------------------------------
 
+add_subdirectory(libs/detail)
 add_subdirectory(libs/blocking_queue)
 add_subdirectory(libs/bounded_blocking_queue)
 add_subdirectory(libs/ring_buffer)

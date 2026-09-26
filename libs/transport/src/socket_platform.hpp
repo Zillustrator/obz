@@ -6,9 +6,6 @@
 
 #include <cstddef>
 #include <span>
-#include <string>
-#include <system_error>
-#include <vector>
 
 namespace obz::transport::detail {
 
@@ -16,7 +13,6 @@ native_socket_handle invalid_socket() noexcept;
 bool is_valid(native_socket_handle handle) noexcept;
 
 void close_socket(native_socket_handle handle) noexcept;
-std::system_error last_socket_error(const std::string& message);
 
 native_socket_handle create_tcp_socket();
 native_socket_handle create_udp_socket();
@@ -28,13 +24,15 @@ void listen_socket(native_socket_handle handle, int backlog);
 native_socket_handle accept_socket(native_socket_handle handle);
 
 std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> data);
-std::vector<std::byte> receive_tcp(native_socket_handle handle, std::size_t max_bytes);
+std::size_t receive_tcp(native_socket_handle handle, std::span<std::byte> destination);
 
 std::size_t send_udp(
     native_socket_handle handle,
     const endpoint& remote_endpoint,
     std::span<const std::byte> data);
-datagram receive_udp(native_socket_handle handle, std::size_t max_bytes);
+udp_receive_result receive_udp(
+    native_socket_handle handle,
+    std::span<std::byte> destination);
 
 endpoint local_endpoint_for(native_socket_handle handle);
 

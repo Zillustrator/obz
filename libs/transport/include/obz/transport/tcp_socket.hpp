@@ -2,12 +2,21 @@
 
 #include <cstddef>
 #include <span>
-#include <vector>
 
 #include <obz/transport/endpoint.hpp>
 #include <obz/transport/native_handle.hpp>
 
 namespace obz::transport {
+
+enum class receive_status {
+    completed,
+    peer_closed,
+};
+
+struct receive_result {
+    std::size_t bytes_received{0};
+    receive_status status{receive_status::peer_closed};
+};
 
 class tcp_socket {
 public:
@@ -26,7 +35,8 @@ public:
 
     std::size_t send(std::span<const std::byte> data);
     void send_all(std::span<const std::byte> data);
-    std::vector<std::byte> receive(std::size_t max_bytes = 4096);
+    [[nodiscard]] receive_result receive_some(std::span<std::byte> destination);
+    [[nodiscard]] receive_result receive_exactly(std::span<std::byte> destination);
 
     void close();
 

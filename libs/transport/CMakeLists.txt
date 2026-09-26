@@ -23,6 +23,10 @@ target_compile_features(obz_transport
         cxx_std_20
 )
 
+if (OBZ_ENABLE_ASAN_UBSAN)
+    obz_enable_asan_ubsan(obz_transport)
+endif()
+
 if (WIN32)
     target_sources(obz_transport
         PRIVATE

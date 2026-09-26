@@ -8,11 +8,22 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <string>
+#include <system_error>
 #include <utility>
 
 namespace obz::transport::detail {
 
 namespace {
+
+std::system_error socket_error(int error_code, const std::string& message) {
+    return std::system_error(error_code, std::generic_category(), message);
+}
+
+std::system_error last_socket_error(const char* message) {
+    const auto error_code = errno;
+    return socket_error(error_code, message);
+}
 
 sockaddr_in to_sockaddr_in(const endpoint& value) {
     sockaddr_in address{};
@@ -38,6 +49,28 @@ endpoint from_sockaddr_in(const sockaddr_in& address) {
     return endpoint{std::string(host), ntohs(address.sin_port)};
 }
 
+native_socket_handle configure_tcp_socket(native_socket_handle handle) {
+#if defined(__APPLE__)
+    int no_sigpipe = 1;
+
+    if (::setsockopt(handle, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe)) < 0) {
+        const auto error = last_socket_error("failed to disable SIGPIPE on TCP socket");
+        ::close(handle);
+        throw error;
+    }
+#endif
+
+    return handle;
+}
+
+int tcp_send_flags() noexcept {
+#if defined(MSG_NOSIGNAL)
+    return MSG_NOSIGNAL;
+#else
+    return 0;
+#endif
+}
+
 } // namespace
 
 native_socket_handle invalid_socket() noexcept {
@@ -54,10 +87,6 @@ void close_socket(native_socket_handle handle) noexcept {
     }
 }
 
-std::system_error last_socket_error(const std::string& message) {
-    return std::system_error(errno, std::generic_category(), message);
-}
-
 native_socket_handle create_tcp_socket() {
     const auto handle = ::socket(AF_INET, SOCK_STREAM, 0);
 
@@ -65,7 +94,7 @@ native_socket_handle create_tcp_socket() {
         throw last_socket_error("failed to create TCP socket");
     }
 
-    return handle;
+    return configure_tcp_socket(handle);
 }
 
 native_socket_handle create_udp_socket() {
@@ -82,7 +111,9 @@ void connect_socket(native_socket_handle handle, const endpoint& remote_endpoint
     const auto address = to_sockaddr_in(remote_endpoint);
 
     if (::connect(handle, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) < 0) {
-        throw last_socket_error(
+        const auto error_code = errno;
+        throw socket_error(
+            error_code,
             "failed to connect to " + remote_endpoint.host + ":" +
             std::to_string(remote_endpoint.port));
     }
@@ -92,7 +123,9 @@ void bind_socket(native_socket_handle handle, const endpoint& local_endpoint) {
     const auto address = to_sockaddr_in(local_endpoint);
 
     if (::bind(handle, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) < 0) {
-        throw last_socket_error(
+        const auto error_code = errno;
+        throw socket_error(
+            error_code,
             "failed to bind socket to " + local_endpoint.host + ":" +
             std::to_string(local_endpoint.port));
     }
@@ -124,11 +157,11 @@ native_socket_handle accept_socket(native_socket_handle handle) {
         throw last_socket_error("failed to accept TCP connection");
     }
 
-    return client_handle;
+    return configure_tcp_socket(client_handle);
 }
 
 std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> data) {
-    const auto bytes_sent = ::send(handle, data.data(), data.size(), 0);
+    const auto bytes_sent = ::send(handle, data.data(), data.size(), tcp_send_flags());
 
     if (bytes_sent < 0) {
         throw last_socket_error("failed to send TCP data");
@@ -137,16 +170,14 @@ std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> dat
     return static_cast<std::size_t>(bytes_sent);
 }
 
-std::vector<std::byte> receive_tcp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
-    const auto bytes_received = ::recv(handle, buffer.data(), buffer.size(), 0);
+std::size_t receive_tcp(native_socket_handle handle, std::span<std::byte> destination) {
+    const auto bytes_received = ::recv(handle, destination.data(), destination.size(), 0);
 
     if (bytes_received < 0) {
         throw last_socket_error("failed to receive TCP data");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return buffer;
+    return static_cast<std::size_t>(bytes_received);
 }
 
 std::size_t send_udp(
@@ -169,25 +200,31 @@ std::size_t send_udp(
     return static_cast<std::size_t>(bytes_sent);
 }
 
-datagram receive_udp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
+udp_receive_result receive_udp(
+    native_socket_handle handle,
+    std::span<std::byte> destination) {
     sockaddr_in sender_address{};
-    socklen_t sender_address_size = sizeof(sender_address);
+    iovec buffer{destination.data(), destination.size()};
+    msghdr message{};
+    message.msg_name = &sender_address;
+    message.msg_namelen = sizeof(sender_address);
+    message.msg_iov = &buffer;
+    message.msg_iovlen = 1;
 
-    const auto bytes_received = ::recvfrom(
-        handle,
-        buffer.data(),
-        buffer.size(),
-        0,
-        reinterpret_cast<sockaddr*>(&sender_address),
-        &sender_address_size);
+    const auto bytes_received = ::recvmsg(handle, &message, 0);
 
     if (bytes_received < 0) {
         throw last_socket_error("failed to receive UDP datagram");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return datagram{from_sockaddr_in(sender_address), std::move(buffer)};
+    const auto status = (message.msg_flags & MSG_TRUNC) != 0
+                            ? datagram_status::truncated
+                            : datagram_status::complete;
+
+    return udp_receive_result{
+        from_sockaddr_in(sender_address),
+        static_cast<std::size_t>(bytes_received),
+        status};
 }
 
 endpoint local_endpoint_for(native_socket_handle handle) {

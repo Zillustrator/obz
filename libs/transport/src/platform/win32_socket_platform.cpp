@@ -4,6 +4,10 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
@@ -11,11 +15,22 @@
 #include <limits>
 #include <mutex>
 #include <stdexcept>
+#include <string>
+#include <system_error>
 #include <utility>
 
 namespace obz::transport::detail {
 
 namespace {
+
+std::system_error socket_error(int error_code, const std::string& message) {
+    return std::system_error(error_code, std::system_category(), message);
+}
+
+std::system_error last_socket_error(const char* message) {
+    const auto error_code = ::WSAGetLastError();
+    return socket_error(error_code, message);
+}
 
 SOCKET to_socket(native_socket_handle handle) noexcept {
     return static_cast<SOCKET>(handle);
@@ -92,10 +107,6 @@ void close_socket(native_socket_handle handle) noexcept {
     }
 }
 
-std::system_error last_socket_error(const std::string& message) {
-    return std::system_error(::WSAGetLastError(), std::system_category(), message);
-}
-
 native_socket_handle create_tcp_socket() {
     ensure_winsock_started();
 
@@ -125,7 +136,9 @@ void connect_socket(native_socket_handle handle, const endpoint& remote_endpoint
 
     if (::connect(to_socket(handle), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) ==
         SOCKET_ERROR) {
-        throw last_socket_error(
+        const auto error_code = ::WSAGetLastError();
+        throw socket_error(
+            error_code,
             "failed to connect to " + remote_endpoint.host + ":" +
             std::to_string(remote_endpoint.port));
     }
@@ -136,7 +149,9 @@ void bind_socket(native_socket_handle handle, const endpoint& local_endpoint) {
 
     if (::bind(to_socket(handle), reinterpret_cast<const sockaddr*>(&address), sizeof(address)) ==
         SOCKET_ERROR) {
-        throw last_socket_error(
+        const auto error_code = ::WSAGetLastError();
+        throw socket_error(
+            error_code,
             "failed to bind socket to " + local_endpoint.host + ":" +
             std::to_string(local_endpoint.port));
     }
@@ -185,20 +200,18 @@ std::size_t send_tcp(native_socket_handle handle, std::span<const std::byte> dat
     return static_cast<std::size_t>(bytes_sent);
 }
 
-std::vector<std::byte> receive_tcp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
+std::size_t receive_tcp(native_socket_handle handle, std::span<std::byte> destination) {
     const auto bytes_received = ::recv(
         to_socket(handle),
-        reinterpret_cast<char*>(buffer.data()),
-        checked_socket_size(buffer.size()),
+        reinterpret_cast<char*>(destination.data()),
+        checked_socket_size(destination.size()),
         0);
 
     if (bytes_received == SOCKET_ERROR) {
         throw last_socket_error("failed to receive TCP data");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return buffer;
+    return static_cast<std::size_t>(bytes_received);
 }
 
 std::size_t send_udp(
@@ -221,25 +234,37 @@ std::size_t send_udp(
     return static_cast<std::size_t>(bytes_sent);
 }
 
-datagram receive_udp(native_socket_handle handle, std::size_t max_bytes) {
-    std::vector<std::byte> buffer(max_bytes);
+udp_receive_result receive_udp(
+    native_socket_handle handle,
+    std::span<std::byte> destination) {
     sockaddr_in sender_address{};
     int sender_address_size = sizeof(sender_address);
 
     const auto bytes_received = ::recvfrom(
         to_socket(handle),
-        reinterpret_cast<char*>(buffer.data()),
-        checked_socket_size(buffer.size()),
+        reinterpret_cast<char*>(destination.data()),
+        checked_socket_size(destination.size()),
         0,
         reinterpret_cast<sockaddr*>(&sender_address),
         &sender_address_size);
 
     if (bytes_received == SOCKET_ERROR) {
-        throw last_socket_error("failed to receive UDP datagram");
+        const auto error_code = ::WSAGetLastError();
+
+        if (error_code == WSAEMSGSIZE) {
+            return udp_receive_result{
+                from_sockaddr_in(sender_address),
+                destination.size(),
+                datagram_status::truncated};
+        }
+
+        throw socket_error(error_code, "failed to receive UDP datagram");
     }
 
-    buffer.resize(static_cast<std::size_t>(bytes_received));
-    return datagram{from_sockaddr_in(sender_address), std::move(buffer)};
+    return udp_receive_result{
+        from_sockaddr_in(sender_address),
+        static_cast<std::size_t>(bytes_received),
+        datagram_status::complete};
 }
 
 endpoint local_endpoint_for(native_socket_handle handle) {

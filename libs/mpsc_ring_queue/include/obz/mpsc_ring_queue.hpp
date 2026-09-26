@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <utility>
 
+#include <obz/detail/cache_alignment.hpp>
+
 namespace obz {
 
 template <typename T, std::size_t Capacity>
@@ -167,7 +169,7 @@ private:
 
     std::array<cell, Capacity> buffer_{};
 
-    struct alignas(std::hardware_destructive_interference_size) cache_aligned_atomic_size_t {
+    struct alignas(obz::detail::destructive_interference_size) cache_aligned_atomic_size_t {
         std::atomic<std::size_t> value{0};
     };
 
