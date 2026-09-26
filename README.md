@@ -144,6 +144,42 @@ installed-package and `FetchContent` consumption.
 
 ---
 
+## Linux Development From VS Code
+
+Open this repository root (the `ObzLib/repo` folder in the adjacent-project layout)
+in VS Code, start Docker Desktop, then choose **Terminal → Run Task…**.
+The `ObzLib Linux:` tasks provide an interactive shell, GCC and Clang test runs,
+ASan/UBSan builds for either compiler, and multicast integration tests.
+Each task first builds the development image, reusing Docker's build cache.
+The initial image build and CMake dependency fetch require internet access.
+
+The helper also works directly from a macOS or Linux terminal:
+
+```sh
+./scripts/linux-dev.sh build-image
+./scripts/linux-dev.sh shell
+./scripts/linux-dev.sh test-gcc
+./scripts/linux-dev.sh test-clang-sanitize
+./scripts/linux-dev.sh test-multicast
+```
+
+The Ubuntu image includes compilers, Clang sanitizer runtimes, GDB, `strace`,
+network diagnostics and manual pages. Sources are mounted read-only at
+`/workspace/obz`: edit them in VS Code on the host. Build output persists in the
+`obzlib-linux-build` Docker volume at `/build`, with separate compiler/sanitizer
+directories. This setup works independently of Market Lab.
+
+The ordinary test tasks run CTest; sanitizer tasks omit the package-consumer check
+as described above. **Test Multicast** runs the two opt-in multicast tests with GCC.
+To run them in a sanitizer build after its test task has completed, open the Linux
+shell and run, for example:
+
+```sh
+/build/clang-asan-ubsan/tests/obz_tests '[.multicast],[.multicast-membership]'
+```
+
+---
+
 ## Running Tests
 
 ```bash

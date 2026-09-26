@@ -31,3 +31,7 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Test multicast membership
+        timeout-minutes: 2
+        run: ./build/tests/Debug/obz_tests.exe '[.multicast-membership]'

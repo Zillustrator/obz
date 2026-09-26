@@ -1,0 +1,112 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ObzLib Linux: Build Development Image",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "build-image"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ObzLib Linux: Open Shell",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "shell"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "presentation": {
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "ObzLib Linux: Test GCC",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "test-gcc"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "group": "test"
+    },
+    {
+      "label": "ObzLib Linux: Test Clang",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "test-clang"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "group": "test"
+    },
+    {
+      "label": "ObzLib Linux: Test GCC ASan + UBSan",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "test-gcc-sanitize"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "group": "test"
+    },
+    {
+      "label": "ObzLib Linux: Test Clang ASan + UBSan",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "test-clang-sanitize"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "group": "test"
+    },
+    {
+      "label": "ObzLib Linux: Test Multicast",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/scripts/linux-dev.sh",
+        "test-multicast"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "dependsOn": "ObzLib Linux: Build Development Image",
+      "group": "test"
+    }
+  ]
+}

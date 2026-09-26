@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <span>
+#include <string>
 
 #include <obz/transport/endpoint.hpp>
 #include <obz/transport/native_handle.hpp>
@@ -33,6 +34,11 @@ public:
 
     void open();
     void bind(const endpoint& local_endpoint);
+
+    void join_multicast_group(
+        const std::string& group_address, const std::string& interface_address);
+    void leave_multicast_group(
+        const std::string& group_address, const std::string& interface_address);
 
     std::size_t send_to(const endpoint& remote_endpoint, std::span<const std::byte> data);
     [[nodiscard]] udp_receive_result receive_from(std::span<std::byte> destination);

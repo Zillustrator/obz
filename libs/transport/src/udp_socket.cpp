@@ -46,6 +46,24 @@ void udp_socket::bind(const endpoint& local_endpoint) {
     }
 }
 
+void udp_socket::join_multicast_group(
+    const std::string& group_address, const std::string& interface_address) {
+    if (!is_open()) {
+        throw std::runtime_error("UDP socket is not open");
+    }
+
+    detail::join_multicast_group(socket_handle_, group_address, interface_address);
+}
+
+void udp_socket::leave_multicast_group(
+    const std::string& group_address, const std::string& interface_address) {
+    if (!is_open()) {
+        throw std::runtime_error("UDP socket is not open");
+    }
+
+    detail::leave_multicast_group(socket_handle_, group_address, interface_address);
+}
+
 std::size_t udp_socket::send_to(const endpoint& remote_endpoint, std::span<const std::byte> data) {
     if (!is_open()) {
         throw std::runtime_error("UDP socket is not open");

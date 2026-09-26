@@ -7,13 +7,16 @@
 #include <cstdint>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <system_error>
 #include <utility>
 #include <vector>
 
 #if !defined(_WIN32)
+#include <arpa/inet.h>
 #include <cerrno>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -428,3 +431,89 @@ TEST_CASE("transport tcp_socket reports a broken send without terminating the pr
     REQUIRE(WEXITSTATUS(child_status) == 0);
 }
 #endif
+
+TEST_CASE("transport multicast membership requires an open socket") {
+    obz::transport::udp_socket socket;
+    REQUIRE_THROWS_AS(
+        socket.join_multicast_group("239.255.0.1", "127.0.0.1"), std::runtime_error);
+    REQUIRE_THROWS_AS(
+        socket.leave_multicast_group("239.255.0.1", "127.0.0.1"), std::runtime_error);
+}
+
+TEST_CASE("transport multicast rejects invalid addresses without replacing the socket") {
+    obz::transport::udp_socket socket;
+    socket.open();
+    const auto handle = socket.native_handle();
+
+    for (const auto& group : {
+             std::string{"127.0.0.1"}, std::string{"223.255.255.255"},
+             std::string{"240.0.0.0"}, std::string{"not-an-address"},
+             std::string{"239.255.0.1\0suffix", 18}}) {
+        REQUIRE_THROWS_AS(
+            socket.join_multicast_group(group, "127.0.0.1"), std::invalid_argument);
+        REQUIRE_THROWS_AS(
+            socket.leave_multicast_group(group, "127.0.0.1"), std::invalid_argument);
+    }
+
+    for (const auto& interface : {
+             std::string{"not-an-address"}, std::string{"239.255.0.1"},
+             std::string{"255.255.255.255"}, std::string{"0.0.0.1"},
+             std::string{"127.0.0.1\0suffix", 16}}) {
+        REQUIRE_THROWS_AS(
+            socket.join_multicast_group("239.255.0.1", interface), std::invalid_argument);
+        REQUIRE_THROWS_AS(
+            socket.leave_multicast_group("239.255.0.1", interface), std::invalid_argument);
+    }
+
+    REQUIRE(socket.is_open());
+    REQUIRE(socket.native_handle() == handle);
+}
+
+#if !defined(_WIN32)
+TEST_CASE("transport receives IPv4 multicast on loopback", "[.multicast]") {
+    // Opt in: the host must support multicast on its loopback interface.
+    obz::transport::udp_socket receiver;
+    receiver.bind({"0.0.0.0", 0});
+    receiver.join_multicast_group("239.255.0.1", "127.0.0.1");
+    const auto port = receiver.local_endpoint().port;
+    obz::transport::udp_socket moved_receiver{std::move(receiver)};
+
+    timeval timeout{2, 0};
+    REQUIRE(::setsockopt(moved_receiver.native_handle(), SOL_SOCKET, SO_RCVTIMEO,
+                        &timeout, sizeof(timeout)) == 0);
+
+    obz::transport::udp_socket sender;
+    sender.open();
+    in_addr interface{};
+    REQUIRE(::inet_pton(AF_INET, "127.0.0.1", &interface) == 1);
+    REQUIRE(::setsockopt(sender.native_handle(), IPPROTO_IP, IP_MULTICAST_IF,
+                        &interface, sizeof(interface)) == 0);
+    unsigned char loopback{1};
+    REQUIRE(::setsockopt(sender.native_handle(), IPPROTO_IP, IP_MULTICAST_LOOP,
+                        &loopback, sizeof(loopback)) == 0);
+
+    const auto payload = bytes({1, 2, 3, 4});
+    REQUIRE(sender.send_to({"239.255.0.1", port}, payload) == payload.size());
+    std::array<std::byte, 16> destination{};
+    const auto result = moved_receiver.receive_from(destination);
+    REQUIRE(result.status == obz::transport::datagram_status::complete);
+    require_bytes_equal(
+        std::span<const std::byte>{destination}.first(result.bytes_received), payload);
+    REQUIRE(result.sender.host == "127.0.0.1");
+}
+#endif
+
+TEST_CASE("transport multicast membership can be removed and rejoined", "[.multicast-membership]") {
+    obz::transport::udp_socket receiver;
+    receiver.bind({"0.0.0.0", 0});
+    const auto handle = receiver.native_handle();
+    const auto port = receiver.local_endpoint().port;
+    receiver.join_multicast_group("239.255.0.1", "127.0.0.1");
+    receiver.leave_multicast_group("239.255.0.1", "127.0.0.1");
+    REQUIRE(receiver.native_handle() == handle);
+    REQUIRE(receiver.local_endpoint().port == port);
+    // A second removal must report a native error, not silently succeed.
+    REQUIRE_THROWS_AS(
+        receiver.leave_multicast_group("239.255.0.1", "127.0.0.1"), std::system_error);
+    REQUIRE_NOTHROW(receiver.join_multicast_group("239.255.0.1", "127.0.0.1"));
+}

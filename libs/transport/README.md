@@ -12,6 +12,7 @@ This library solves one narrow problem: moving bytes between IPv4 endpoints whil
 - Move-only TCP socket wrapper
 - TCP listener with `accept`
 - UDP socket with `send_to` and `receive_from`
+- IPv4 multicast group join and leave on POSIX and Winsock
 - Explicit reporting of complete, empty and truncated UDP datagrams
 - TCP `send_all` helper for complete buffer writes
 - TCP `receive_some` and `receive_exactly` operations using caller-owned storage
@@ -122,6 +123,78 @@ complete result may contain zero bytes because UDP permits empty datagrams. If t
 larger than the destination, the result is `truncated`, `bytes_received` equals the bytes retained
 in the destination, and the remainder of that datagram has been discarded by the operating system.
 The next receive starts with the next datagram.
+
+---
+
+### IPv4 multicast
+
+```cpp
+void join_multicast_group(
+    const std::string& group_address, const std::string& interface_address);
+void leave_multicast_group(
+    const std::string& group_address, const std::string& interface_address);
+```
+
+Join and leave are implemented on POSIX and Winsock. Leaving removes the specified
+group/interface membership while keeping the socket open and bound to the same port.
+Closing the socket releases all of its memberships.
+
+```cpp
+obz::transport::udp_socket receiver;
+receiver.bind({"0.0.0.0", 9000});
+receiver.join_multicast_group("239.255.0.1", "192.168.1.20");
+// Replace 192.168.1.20 with the IPv4 address of your receiving network adapter.
+// Use the existing blocking receive_from(buffer) to receive datagrams.
+```
+
+The group identifies multicast traffic; the UDP destination port selects the receiving
+socket. Bind reserves the local endpoint but does not join a group. Wildcard binding
+(`0.0.0.0`) is the portable receive pattern. The membership interface is a local IPv4
+address, not the sender address, an adapter name, or an interface index. Passing
+`0.0.0.0` as the interface asks the OS to select one; it does not join on every adapter.
+Specify an interface explicitly on machines with multiple adapters.
+
+Membership operations require an open socket. Bind before joining: `bind()` replaces
+the native socket and therefore discards its memberships and options. Move transfers
+memberships with the handle. A failed membership operation does not close the socket.
+Malformed addresses, non-multicast groups and invalid interface address classes throw
+`std::invalid_argument`; native failures throw `std::system_error`. Whether a unicast
+interface address actually belongs to this host is checked by the OS. Duplicate joins
+and leaving an absent membership are passed to the OS, not made idempotent by a registry.
+
+This is any-source IPv4 multicast. Membership uses a group/interface pair, with no port
+or source filter. `receive_from` still reports the sender, not the destination group;
+wildcard sockets can also receive unicast traffic. Joining is not an exclusive traffic
+filter, and platform delivery rules can differ when sockets share a port.
+
+Existing `send_to({group, port}, payload)` sends multicast using OS routing; joining is
+not required to send. Selecting the outbound interface is separate from receive membership.
+Shared-port binding, public sender interface/TTL/loopback options, IPv6, non-blocking I/O
+and event loops are outside this first increment. Use one receiver per port for now.
+Feed configuration, decoders, sequence semantics and reconstructed market views belong
+in Market Lab; this library only moves datagrams and manages socket membership.
+
+#### Multicast integration tests
+
+The opt-in membership test verifies that leaving preserves the socket handle and bound
+port, a second leave reports a native error, and the same group can be joined again:
+
+```sh
+./build-package/tests/obz_tests '[.multicast-membership]'
+```
+
+The separate POSIX loopback delivery test verifies join, payload reception and membership
+ownership after moving the socket. It uses native sender-interface and receive-timeout
+options only in test code, so a missing packet fails within two seconds:
+
+```sh
+./build-package/tests/obz_tests '[.multicast]'
+```
+
+These tests are hidden from the default Catch2 run because multicast interface support
+varies across hosts. Ordinary validation tests run in the portable suite. CTest discovery
+explicitly excludes these two tags. Linux CI runs both integration tests with GCC and
+Clang, with and without ASan/UBSan. Windows CI runs the membership test with MSVC.
 
 ---
 
