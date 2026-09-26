@@ -39,6 +39,32 @@ sockaddr_in to_sockaddr_in(const endpoint& value) {
     return address;
 }
 
+ip_mreq multicast_request(
+    const std::string& group_address, const std::string& interface_address) {
+    // Reject embedded NULs before passing strings to native parsers.
+    if (group_address.find('\0') != std::string::npos ||
+        interface_address.find('\0') != std::string::npos) {
+        throw std::invalid_argument("multicast addresses must not contain embedded NULs");
+    }
+
+    ip_mreq request{};
+    request.imr_multiaddr = to_sockaddr_in({group_address, 0}).sin_addr;
+    request.imr_interface = to_sockaddr_in({interface_address, 0}).sin_addr;
+
+    const auto group = ntohl(request.imr_multiaddr.s_addr);
+    if ((group & 0xf0000000u) != 0xe0000000u) {
+        throw std::invalid_argument("group address must be an IPv4 multicast address");
+    }
+
+    const auto interface_host = ntohl(request.imr_interface.s_addr);
+    if (interface_host != 0 &&
+        ((interface_host & 0xff000000u) == 0 || interface_host >= 0xe0000000u)) {
+        throw std::invalid_argument("interface address must be a local unicast IPv4 address or 0.0.0.0");
+    }
+
+    return request;
+}
+
 endpoint from_sockaddr_in(const sockaddr_in& address) {
     char host[INET_ADDRSTRLEN]{};
 
@@ -225,6 +251,28 @@ udp_receive_result receive_udp(
         from_sockaddr_in(sender_address),
         static_cast<std::size_t>(bytes_received),
         status};
+}
+
+void join_multicast_group(
+    native_socket_handle handle,
+    const std::string& group_address,
+    const std::string& interface_address) {
+    const auto request = multicast_request(group_address, interface_address);
+
+    if (::setsockopt(handle, IPPROTO_IP, IP_ADD_MEMBERSHIP, &request, sizeof(request)) < 0) {
+        throw last_socket_error("failed to join IPv4 multicast group");
+    }
+}
+
+void leave_multicast_group(
+    native_socket_handle handle,
+    const std::string& group_address,
+    const std::string& interface_address) {
+    const auto request = multicast_request(group_address, interface_address);
+
+    if (::setsockopt(handle, IPPROTO_IP, IP_DROP_MEMBERSHIP, &request, sizeof(request)) < 0) {
+        throw last_socket_error("failed to leave IPv4 multicast group");
+    }
 }
 
 endpoint local_endpoint_for(native_socket_handle handle) {

@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <span>
+#include <string>
 
 namespace obz::transport::detail {
 
@@ -33,6 +34,15 @@ std::size_t send_udp(
 udp_receive_result receive_udp(
     native_socket_handle handle,
     std::span<std::byte> destination);
+
+void join_multicast_group(
+    native_socket_handle handle,
+    const std::string& group_address,
+    const std::string& interface_address);
+void leave_multicast_group(
+    native_socket_handle handle,
+    const std::string& group_address,
+    const std::string& interface_address);
 
 endpoint local_endpoint_for(native_socket_handle handle);
 

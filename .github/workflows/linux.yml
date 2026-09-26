@@ -1,0 +1,48 @@
+name: Linux
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+        sanitizers: ["OFF", "ON"]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
+          -DOBZ_BUILD_TESTS=ON
+          -DOBZ_BUILD_EXAMPLES=OFF
+          -DOBZ_ENABLE_ASAN_UBSAN=${{ matrix.sanitizers }}
+
+      - name: Build
+        run: cmake --build build --parallel 4
+
+      - name: Test
+        if: matrix.sanitizers == 'OFF'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Test with sanitizers
+        if: matrix.sanitizers == 'ON'
+        run: ctest --test-dir build --exclude-regex '^obz_package_consumer$' --output-on-failure
+
+      - name: Test multicast delivery and membership
+        timeout-minutes: 2
+        run: ./build/tests/obz_tests '[.multicast],[.multicast-membership]'

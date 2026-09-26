@@ -66,6 +66,8 @@ endif()
 
 catch_discover_tests(
     obz_tests
+    # Run multicast integration tests explicitly on hosts with multicast support.
+    TEST_SPEC "~[.multicast]~[.multicast-membership]"
     PROPERTIES
         TIMEOUT ${obz_test_timeout}
 )
