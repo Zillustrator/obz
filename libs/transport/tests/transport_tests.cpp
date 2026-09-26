@@ -116,6 +116,42 @@ TEST_CASE("transport udp_socket reports truncated datagrams") {
     require_bytes_equal(destination, std::span<const std::byte>{payload}.first(destination.size()));
 }
 
+TEST_CASE("transport udp_socket receives empty datagrams") {
+    obz::transport::udp_socket receiver;
+
+    try {
+        receiver.bind({"127.0.0.1", 0});
+    } catch (const std::system_error& error) {
+        if (is_operation_not_permitted(error)) {
+            SKIP("localhost UDP bind is not permitted in this environment");
+        }
+
+        throw;
+    }
+
+    obz::transport::udp_socket sender;
+    sender.open();
+
+    const auto receiver_endpoint = receiver.local_endpoint();
+    REQUIRE(sender.send_to(receiver_endpoint, std::span<const std::byte>{}) == 0);
+
+    const auto following_payload = bytes({5, 6});
+    REQUIRE(sender.send_to(receiver_endpoint, following_payload) == following_payload.size());
+
+    std::array<std::byte, 2> destination{};
+    const auto empty_result = receiver.receive_from(destination);
+
+    REQUIRE(empty_result.status == obz::transport::datagram_status::complete);
+    REQUIRE(empty_result.bytes_received == 0);
+    REQUIRE(empty_result.sender.port != 0);
+
+    const auto following_result = receiver.receive_from(destination);
+
+    REQUIRE(following_result.status == obz::transport::datagram_status::complete);
+    REQUIRE(following_result.bytes_received == following_payload.size());
+    require_bytes_equal(destination, following_payload);
+}
+
 TEST_CASE("transport tcp_listener accepts a tcp_socket connection on localhost") {
     obz::transport::tcp_listener listener;
 
