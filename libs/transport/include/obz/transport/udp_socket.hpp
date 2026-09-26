@@ -35,7 +35,7 @@ public:
     void bind(const endpoint& local_endpoint);
 
     std::size_t send_to(const endpoint& remote_endpoint, std::span<const std::byte> data);
-    udp_receive_result receive_from(std::span<std::byte> destination);
+    [[nodiscard]] udp_receive_result receive_from(std::span<std::byte> destination);
 
     void close();
 

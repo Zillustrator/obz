@@ -112,7 +112,6 @@ TEST_CASE("transport udp_socket sends and receives datagrams on localhost") {
 
 TEST_CASE("transport udp_socket rejects an empty receive destination") {
     obz::transport::udp_socket socket;
-    socket.open();
 
     REQUIRE_THROWS_AS(socket.receive_from(std::span<std::byte>{}), std::invalid_argument);
 }

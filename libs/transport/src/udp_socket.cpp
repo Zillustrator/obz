@@ -55,12 +55,12 @@ std::size_t udp_socket::send_to(const endpoint& remote_endpoint, std::span<const
 }
 
 udp_receive_result udp_socket::receive_from(std::span<std::byte> destination) {
-    if (!is_open()) {
-        throw std::runtime_error("UDP socket is not open");
-    }
-
     if (destination.empty()) {
         throw std::invalid_argument("UDP receive destination must not be empty");
+    }
+
+    if (!is_open()) {
+        throw std::runtime_error("UDP socket is not open");
     }
 
     return detail::receive_udp(socket_handle_, destination);

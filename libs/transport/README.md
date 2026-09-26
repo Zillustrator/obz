@@ -12,6 +12,7 @@ This library solves one narrow problem: moving bytes between IPv4 endpoints whil
 - Move-only TCP socket wrapper
 - TCP listener with `accept`
 - UDP socket with `send_to` and `receive_from`
+- Explicit reporting of complete, empty and truncated UDP datagrams
 - TCP `send_all` helper for complete buffer writes
 - TCP `receive_some` and `receive_exactly` operations using caller-owned storage
 - RAII close in destructors
@@ -61,6 +62,11 @@ int main() {
     if (result.status == obz::transport::datagram_status::truncated) {
         return 1;
     }
+
+    const auto received =
+        std::span<const std::byte>{receive_buffer}.first(result.bytes_received);
+
+    // Decode only `received`, not the unused remainder of `receive_buffer`.
 }
 ```
 
@@ -101,7 +107,7 @@ public:
     void bind(const endpoint& local_endpoint);
 
     std::size_t send_to(const endpoint& remote_endpoint, std::span<const std::byte> data);
-    udp_receive_result receive_from(std::span<std::byte> destination);
+    [[nodiscard]] udp_receive_result receive_from(std::span<std::byte> destination);
 
     void close();
 
@@ -138,8 +144,8 @@ public:
 
     std::size_t send(std::span<const std::byte> data);
     void send_all(std::span<const std::byte> data);
-    receive_result receive_some(std::span<std::byte> destination);
-    receive_result receive_exactly(std::span<std::byte> destination);
+    [[nodiscard]] receive_result receive_some(std::span<std::byte> destination);
+    [[nodiscard]] receive_result receive_exactly(std::span<std::byte> destination);
 
     void close();
 
@@ -202,13 +208,15 @@ public:
 
 ## Behaviour Summary
 
-| Operation | Invalid State | OS Failure |
-|-----------|---------------|------------|
-| socket operation before open | throws `std::runtime_error` | n/a |
-| bind/connect/send/receive/listen/accept | n/a | throws `std::system_error` |
-| receive with an empty destination | throws `std::invalid_argument` | n/a |
-| peer closes during receive | returns `receive_status::peer_closed` | n/a |
-| close | idempotent | ignored |
+| Situation | Result |
+|-----------|--------|
+| socket operation before open | throws `std::runtime_error` |
+| bind/connect/send/receive/listen/accept OS failure | throws `std::system_error` |
+| TCP or UDP receive with an empty destination | throws `std::invalid_argument` |
+| TCP peer closes during receive | returns `receive_status::peer_closed` |
+| complete empty UDP datagram | returns `datagram_status::complete` with zero bytes |
+| UDP datagram exceeds the destination | returns `datagram_status::truncated` with the retained byte count |
+| close | idempotent; native close failures are ignored |
 
 ---
 
@@ -226,7 +234,7 @@ The classes are move-only because each object owns one native socket handle.
 
 The public API uses `native_socket_handle` instead of exposing POSIX file descriptors directly. On POSIX the handle is an `int`; on Windows it is represented by a pointer-sized unsigned integer compatible with Winsock `SOCKET` values.
 
-Receive operations use caller-owned spans so callers can choose and reuse storage without requiring the socket to own a buffer or allocate on every call. Returned results make orderly peer closure explicit; they do not treat it as an operating-system failure.
+Receive operations use caller-owned spans so callers can choose and reuse storage without requiring the socket to own a buffer or allocate on every call. TCP results make orderly peer closure explicit, while UDP results report the sender, retained byte count and truncation status.
 
 `local_endpoint()` is provided so callers and tests can bind to port `0` and discover the actual ephemeral port chosen by the operating system.
 
@@ -251,14 +259,11 @@ Winsock reports broken sends through its normal error return and does not use `S
 
 This keeps the user-facing API stable while letting CMake select the platform backend.
 
-The POSIX backend is covered by the current local build. The Windows backend follows the same internal boundary and should be validated on Windows before treating it as production-ready.
-
-Before a public production-ready claim, validate this library in CI on:
-
-- macOS or Linux for the POSIX backend
-- Windows for the Winsock backend
-
-The Windows validation should build the library, run the non-network tests, and run the localhost TCP/UDP integration tests in an environment where loopback sockets are permitted.
+The POSIX backend is tested on macOS and Linux. The Windows workflow builds with
+MSVC on Windows Server 2022 and runs the same portable suite, including localhost
+TCP and UDP integration tests against Winsock. Platform-specific POSIX tests for
+interrupted system calls and Linux `SIGPIPE` handling run only where those APIs
+exist.
 
 ---
 
