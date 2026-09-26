@@ -316,6 +316,39 @@ TEST_CASE("transport tcp_listener rejects invalid backlog") {
     REQUIRE_THROWS_AS(listener.listen({"127.0.0.1", 0}, 0), std::invalid_argument);
 }
 
+TEST_CASE("transport udp_socket cleans up after bind failure") {
+    obz::transport::udp_socket socket;
+
+    REQUIRE_THROWS_AS(socket.bind({"not-an-ip-address", 9000}), std::invalid_argument);
+    REQUIRE_FALSE(socket.is_open());
+
+    socket.bind({"127.0.0.1", 0});
+    REQUIRE(socket.is_open());
+}
+
+TEST_CASE("transport tcp_socket cleans up after connect failure") {
+    obz::transport::tcp_socket socket;
+
+    REQUIRE_THROWS_AS(socket.connect({"not-an-ip-address", 9000}), std::invalid_argument);
+    REQUIRE_FALSE(socket.is_open());
+
+    obz::transport::tcp_listener listener;
+    listener.listen({"127.0.0.1", 0});
+
+    socket.connect(listener.local_endpoint());
+    REQUIRE(socket.is_open());
+}
+
+TEST_CASE("transport tcp_listener cleans up after listen failure") {
+    obz::transport::tcp_listener listener;
+
+    REQUIRE_THROWS_AS(listener.listen({"not-an-ip-address", 9000}), std::invalid_argument);
+    REQUIRE_FALSE(listener.is_open());
+
+    listener.listen({"127.0.0.1", 0});
+    REQUIRE(listener.is_open());
+}
+
 TEST_CASE("transport sockets report open state and close idempotently") {
     obz::transport::udp_socket socket;
 
